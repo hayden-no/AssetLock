@@ -1,0 +1,24 @@
+{
+  "name": "com.haydenno.assetlock",
+  "version": "1.0.0",
+  "displayName": "Git LFS Asset Lock",
+  "description": "Integrate a local Git LFS repository with the Unity Editor.",
+  "unity": "2022.3",
+  "unityRelease": "9f1",
+  "documentationUrl": "https://example.com/",
+  "changelogUrl": "https://example.com/changelog.html",
+  "licensesUrl": "https://example.com/licensing.html",
+  "keywords": [
+    "keyword1",
+    "keyword2",
+    "keyword3"
+  ],
+  "author": {
+    "name": "Unity",
+    "email": "unity@example.com",
+    "url": "https://www.unity3d.com"
+  },
+  "dependencies": {
+    "com.unity.settings-manager": "2.0.1"
+  }
+}
