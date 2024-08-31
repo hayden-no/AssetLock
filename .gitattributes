@@ -1,0 +1,2 @@
+E:/Projects/Unity/AssetLock/Assets/Scenes/BinaryScene.unity filter=lfs diff=lfs merge=lfs -text lockable
+E:/Projects/Unity/AssetLock/Assets/Scenes/SampleScene.unity filter=lfs diff=lfs merge=lfs -text lockable

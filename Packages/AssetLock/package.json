@@ -19,6 +19,7 @@
     "url": "https://www.unity3d.com"
   },
   "dependencies": {
-    "com.unity.settings-manager": "2.0.1"
+    "com.unity.settings-manager": "2.0.1",
+    "com.unity.nuget.newtonsoft-json": "3.2.1"
   }
 }
