@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using AssetLock.Editor.Manager;
 using Newtonsoft.Json;
 using UnityEditor;
 

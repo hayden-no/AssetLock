@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using AssetLock.Editor.Manager;
 using UnityEditor;
 using UnityEditor.SettingsManagement;
 using static AssetLock.Editor.AssetLockSettings;
@@ -275,11 +276,11 @@ namespace AssetLock.Editor
 
 					break;
 				case StatusQueryOptions.UseCachedIfPossible:
-					AssetLockManager.Instance.Refresh();
+					//AssetLockManager.Instance.Refresh();
 
 					break;
 				case StatusQueryOptions.UseCachedAsync:
-					_ = AssetLockManager.Instance.RefreshAsync();
+					//_ = AssetLockManager.Instance.RefreshAsync();
 
 					break;
 				default:

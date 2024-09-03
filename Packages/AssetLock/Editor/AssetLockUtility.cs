@@ -17,10 +17,17 @@ namespace AssetLock.Editor
 	{
 		public static class Constants
 		{
+			public const string VERSION = "1.0.0";
+			
 			public const string JSON_FLAG = "--json";
 			
 			public const string DEFAULT_GIT_EXE = "git.exe";
 			public const string DEFAULT_GIT_LFS_EXE = "git-lfs.exe";
+
+			public const string GIT_EXE_DIRECTORY_PATH = "C\\Program Files";
+			
+			public const string GIT_DOWNLOAD_URL = "https://git-scm.com/downloads";
+			public const string GIT_LFS_DOWNLOAD_URL = "https://git-lfs.github.com/";
 
 			public static readonly string[] DEFAULT_TRACKED_EXTENSIONS = new[] { ".prefab", ".unity", ".asset" };
 			public const int DEFAULT_QUICK_CHECK_SIZE = 1024;
@@ -29,6 +36,8 @@ namespace AssetLock.Editor
 			
 			public const string PROJECT_SETTINGS_PROVIDER_PATH = "Project/AssetLock";
 			public const string USER_SETTINGS_PROVIDER_PATH = "Preferences/AssetLock";
+			
+			public const string SETTINGS_TITLE = "AssetLock";
 			
 			public static readonly string PATH =
 				Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.Machine) +
@@ -171,91 +180,13 @@ namespace AssetLock.Editor
 					
 					m_stopwatch?.Stop();
 					
+					if (m_stopwatch?.ElapsedMilliseconds < ProfilingMinTimeMs)
+					{
+						return;
+					}
+					
 					LogVerboseFormat("[Profiling] {0} | {1}ms{2}", m_name, m_stopwatch?.ElapsedMilliseconds, $"\n{m_message}");
 				}
-			}
-		}
-		
-		public static class GUIUtil
-		{
-			private static HashSet<string> s_keywords = null;
-			public static bool MatchSearchGroups(string searchContext, string label)
-			{
-				if (s_keywords != null)
-				{
-					foreach (var keyword in label.Split(' '))
-					{
-						s_keywords.Add(keyword);
-					}
-				}
-
-				if (searchContext == null)
-				{
-					return true;
-				}
-
-				var context = searchContext.Trim();
-
-				if (string.IsNullOrEmpty(context))
-				{
-					return true;
-				}
-			
-				var split = context.Split(' ');
-
-				return split.Any(
-					x => !string.IsNullOrEmpty(x) && label.IndexOf(x, StringComparison.InvariantCultureIgnoreCase) > -1
-				);
-			}
-
-			public static void SearchableLabel(GUIContent label, string searchContext)
-			{
-				if (!MatchSearchGroups(searchContext, label.text))
-				{
-					return;
-				}
-				
-				GUILayout.Label(label);
-			}
-
-			public static void SearchableLabel(
-				GUIContent label,
-				GUIStyle style,
-				string searchContext,
-				params GUILayoutOption[] options
-			)
-			{
-				if (!MatchSearchGroups(searchContext, label.text))
-				{
-					return;
-				}
-				
-				GUILayout.Label(label, style, options);
-			}
-
-			public static bool SearchableButton(GUIContent label, string searchContext)
-			{
-				if (!MatchSearchGroups(searchContext, label.text))
-				{
-					return false;
-				}
-
-				return GUILayout.Button(label);
-			}
-
-			public static bool SearchableButton(
-				GUIContent label,
-				GUIStyle style,
-				string searchContext,
-				params GUILayoutOption[] options
-			)
-			{
-				if (!MatchSearchGroups(searchContext, label.text))
-				{
-					return false;
-				}
-
-				return GUILayout.Button(label, style, options);
 			}
 		}
 		
@@ -396,6 +327,18 @@ namespace AssetLock.Editor
 
 			return GetPathWithoutMeta(path);
 		}
+
+		public static string NormalizePathOrThrow(string path)
+		{
+			if (string.IsNullOrWhiteSpace(path))
+			{
+				throw new Exception("Path is null or empty.");
+			}
+			
+			path = Path.GetFullPath(path);
+			
+			return GetPathWithoutMeta(path);
+		}	
 		
 		public static string ToRelativePath(string path)
 		{

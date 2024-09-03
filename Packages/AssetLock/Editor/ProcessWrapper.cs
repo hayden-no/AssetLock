@@ -166,7 +166,7 @@ namespace AssetLock.Editor
 
 	internal class ProcessInstance : IDisposable
 	{
-		private const int TIMEOUT_DEFAULT = 1000;
+		private const int TIMEOUT_DEFAULT = 2000;
 
 		private readonly Process process;
 		private readonly ProcessStartInfo startInfo;

@@ -45,8 +45,10 @@ namespace AssetLock.Editor
 
 		public void Set(IEnumerable<LockInfo> locks)
 		{
-			m_locks.Clear();
-			m_locks.AddRange(locks);
+			foreach (var info in locks)
+			{
+				m_locks[key2: info.path] = info;
+			}
 		}
 
 		private LockInfo GetOrAddByGuid(string guid)
