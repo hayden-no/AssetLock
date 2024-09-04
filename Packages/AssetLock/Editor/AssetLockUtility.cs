@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
 using UnityEditor;
@@ -18,44 +19,44 @@ namespace AssetLock.Editor
 		public static class Constants
 		{
 			public const string VERSION = "1.0.0";
-			
+
 			public const string JSON_FLAG = "--json";
-			
+
 			public const string DEFAULT_GIT_EXE = "git.exe";
 			public const string DEFAULT_GIT_LFS_EXE = "git-lfs.exe";
 
 			public const string GIT_EXE_DIRECTORY_PATH = "C\\Program Files";
-			
+
 			public const string GIT_DOWNLOAD_URL = "https://git-scm.com/downloads";
 			public const string GIT_LFS_DOWNLOAD_URL = "https://git-lfs.github.com/";
 
 			public static readonly string[] DEFAULT_TRACKED_EXTENSIONS = new[] { ".prefab", ".unity", ".asset" };
 			public const int DEFAULT_QUICK_CHECK_SIZE = 1024;
-			
+
 			public const string PACKAGE_NAME = "com.haydenno.assetlock";
-			
+
 			public const string PROJECT_SETTINGS_PROVIDER_PATH = "Project/AssetLock";
 			public const string USER_SETTINGS_PROVIDER_PATH = "Preferences/AssetLock";
-			
+
 			public const string SETTINGS_TITLE = "AssetLock";
-			
+
 			public static readonly string PATH =
 				Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.Machine) +
 				";" +
 				Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User);
-			
+
 			public const int DEFAULT_LOCK_TIMEOUT = 1000;
 		}
-		
+
 		public static class Logging
 		{
 			const string LOG_PREFIX = "[AssetLock] ";
-			
+
 			static string GetMessage(string message)
 			{
 				return LOG_PREFIX + message;
 			}
-			
+
 			[HideInCallstack]
 			public static void LogVerbose(string message)
 			{
@@ -64,7 +65,7 @@ namespace AssetLock.Editor
 					UnityEngine.Debug.Log(GetMessage(message));
 				}
 			}
-			
+
 			[StringFormatMethod("format")]
 			[HideInCallstack]
 			public static void LogVerboseFormat(string format, params object[] args)
@@ -74,7 +75,7 @@ namespace AssetLock.Editor
 					UnityEngine.Debug.LogFormat(GetMessage(format), args);
 				}
 			}
-			
+
 			[HideInCallstack]
 			public static void Log(string message)
 			{
@@ -83,7 +84,7 @@ namespace AssetLock.Editor
 					UnityEngine.Debug.Log(GetMessage(message));
 				}
 			}
-			
+
 			[StringFormatMethod("format")]
 			[HideInCallstack]
 			public static void LogFormat(string format, params object[] args)
@@ -102,7 +103,7 @@ namespace AssetLock.Editor
 					UnityEngine.Debug.LogWarning(GetMessage(message));
 				}
 			}
-			
+
 			[StringFormatMethod("format")]
 			[HideInCallstack]
 			public static void LogWarningFormat(string format, params object[] args)
@@ -121,7 +122,7 @@ namespace AssetLock.Editor
 					UnityEngine.Debug.LogError(GetMessage(message));
 				}
 			}
-			
+
 			[StringFormatMethod("format")]
 			[HideInCallstack]
 			public static void LogErrorFormat(string format, params object[] args)
@@ -145,6 +146,7 @@ namespace AssetLock.Editor
 						m_stopwatch = null;
 						m_name = null;
 						m_message = null;
+
 						return;
 					}
 
@@ -177,19 +179,24 @@ namespace AssetLock.Editor
 					{
 						return;
 					}
-					
+
 					m_stopwatch?.Stop();
-					
+
 					if (m_stopwatch?.ElapsedMilliseconds < ProfilingMinTimeMs)
 					{
 						return;
 					}
-					
-					LogVerboseFormat("[Profiling] {0} | {1}ms{2}", m_name, m_stopwatch?.ElapsedMilliseconds, $"\n{m_message}");
+
+					LogVerboseFormat(
+						"[Profiling] {0} | {1}ms{2}",
+						m_name,
+						m_stopwatch?.ElapsedMilliseconds,
+						$"\n{m_message}"
+					);
 				}
 			}
 		}
-		
+
 		public static class ControlChars
 		{
 			public const char NUL = (char)0; // Null
@@ -202,30 +209,20 @@ namespace AssetLock.Editor
 		{
 			return (c > ControlChars.NUL && c < ControlChars.BS) || (c > ControlChars.CR && c < ControlChars.SUB);
 		}
-		
-		public static IEnumerable<string> GetAllBinaryPaths(string[] assetOrMetaFilePaths)
+
+		public static IEnumerable<FileReference> GetAllBinaryPaths(string[] assetOrMetaFilePaths)
 		{
-			return assetOrMetaFilePaths.Where(ShouldTrack);
+			return assetOrMetaFilePaths.Select(FileReference.FromPath).Distinct().Where(ShouldTrack);
 		}
 
 		public static bool ShouldTrack(string path)
 		{
-			return ShouldTrack(new FileInfo(NormalizePath(path)));
+			return ShouldTrack(FileReference.FromPath(path));
 		}
 
-		public static bool ShouldTrack(FileInfo info)
+		public static bool ShouldTrack(FileReference info)
 		{
-			if (info == null)
-			{
-				return false;
-			}
-
 			if (!info.Exists)
-			{
-				return false;
-			}
-
-			if (info.Attributes.HasFlag(FileAttributes.Directory))
 			{
 				return false;
 			}
@@ -244,7 +241,7 @@ namespace AssetLock.Editor
 		}
 
 		// https://stackoverflow.com/questions/910873/how-can-i-determine-if-a-file-is-binary-or-text-in-c
-		public static bool IsBinary(FileInfo info, long max = Int64.MaxValue)
+		public static bool IsBinary(FileReference info, long max = Int64.MaxValue)
 		{
 			using (var fs = info.OpenRead())
 			{
@@ -270,7 +267,7 @@ namespace AssetLock.Editor
 			return false;
 		}
 
-		public static bool IsUnityYaml(FileInfo info)
+		public static bool IsUnityYaml(FileReference info)
 		{
 			string line1 = null;
 			string line2 = null;
@@ -297,22 +294,24 @@ namespace AssetLock.Editor
 			return false;
 		}
 
-		public static bool IsTrackedExtension(FileInfo info)
+		public static bool IsTrackedExtension(FileReference info)
 		{
 			return TrackedFileEndings.value.Contains(info.Extension);
 		}
-		
+
 		public static bool TryGetDefaultGitPath(out string path)
 		{
 			string[] paths = Constants.PATH.Split(';');
-			path= paths.Select(x => Path.Combine(x, Constants.DEFAULT_GIT_EXE)).FirstOrDefault(File.Exists);
+			path = paths.Select(x => Path.Combine(x, Constants.DEFAULT_GIT_EXE)).FirstOrDefault(File.Exists);
+
 			return path != null;
 		}
-		
+
 		public static bool TryGetDefaultGitLfsPath(out string path)
 		{
 			string[] paths = Constants.PATH.Split(';');
 			path = paths.Select(x => Path.Combine(x, Constants.DEFAULT_GIT_LFS_EXE)).FirstOrDefault(File.Exists);
+
 			return path != null;
 		}
 
@@ -322,7 +321,7 @@ namespace AssetLock.Editor
 			{
 				return string.Empty;
 			}
-			
+
 			path = Path.GetFullPath(path);
 
 			return GetPathWithoutMeta(path);
@@ -334,17 +333,27 @@ namespace AssetLock.Editor
 			{
 				throw new Exception("Path is null or empty.");
 			}
-			
+
 			path = Path.GetFullPath(path);
-			
+
 			return GetPathWithoutMeta(path);
-		}	
+		}
+
+		public static string ToUnityRelativePath(string path)
+		{
+			return Path.GetRelativePath(Path.Combine(Application.dataPath, "..\\"), path);
+		}
 		
-		public static string ToRelativePath(string path)
+		public static string ToUnityAssetsRelativePath(string path)
 		{
 			return Path.GetRelativePath(Application.dataPath, path);
 		}
-		
+
+		public static string ToGitRelativePath(string path)
+		{
+			return Path.GetRelativePath(GitWorkingDirectory, path);
+		}
+
 		public static string GetPathWithoutMeta(string path)
 		{
 			return path.EndsWith(".meta") ? path.Substring(0, path.Length - 5) : path;

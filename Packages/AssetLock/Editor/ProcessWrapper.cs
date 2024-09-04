@@ -15,7 +15,7 @@ namespace AssetLock.Editor
 		public const string POWERSHELL = "WindowsPowerShell\\v1.0\\powershell.exe";
 		public const string CMD = "cmd.exe";
 
-		public const int PROCESS_WAIT_MS = 5000;
+		public const int PROCESS_TIMEOUT_MS = 5000;
 
 		public readonly string ExePath;
 		public string WorkingPath { get; set; } = Environment.CurrentDirectory;
@@ -131,7 +131,7 @@ namespace AssetLock.Editor
 
 		private bool ShouldRunAgain(string[] args)
 		{
-			return !this.IsSameCommand(args) || this.TimeSinceLastRun() > PROCESS_WAIT_MS;
+			return !this.IsSameCommand(args) || this.TimeSinceLastRun() > PROCESS_TIMEOUT_MS;
 		}
 	}
 
@@ -166,13 +166,11 @@ namespace AssetLock.Editor
 
 	internal class ProcessInstance : IDisposable
 	{
-		private const int TIMEOUT_DEFAULT = 2000;
-
 		private readonly Process process;
 		private readonly ProcessStartInfo startInfo;
 		private readonly StringBuilder stdOut = new StringBuilder();
 		private readonly StringBuilder stdErr = new StringBuilder();
-		public int Timeout { get; set; } = TIMEOUT_DEFAULT;
+		public int Timeout { get; set; } = ProcessWrapper.PROCESS_TIMEOUT_MS;
 
 		private ProcessInstance(string exePath, string workingPath, params string[] args)
 		{
@@ -232,7 +230,7 @@ namespace AssetLock.Editor
 			params string[] args
 		)
 		{
-			ct = ct == CancellationToken.None ? new CancellationTokenSource(TIMEOUT_DEFAULT).Token : ct;
+			ct = ct == CancellationToken.None ? new CancellationTokenSource(ProcessWrapper.PROCESS_TIMEOUT_MS).Token : ct;
 
 			using ProcessInstance instance = new ProcessInstance(exePath, workingPath, args);
 

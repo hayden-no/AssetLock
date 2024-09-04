@@ -13,9 +13,10 @@ using static AssetLock.Editor.AssetLockSettings;
 namespace AssetLock.Editor.Manager
 {
 	[InitializeOnLoad]
-	public partial class AssetLockManager
+	public partial class AssetLockManager : IDisposable
 	{
 		private LockRepo m_lockRepo;
+		internal IReadOnlyDictionary<FileReference, LockInfo> Repo => m_lockRepo;
 
 		private ProcessWrapper m_gitProcess;
 		private ProcessWrapper m_lfsProcess;
@@ -27,8 +28,7 @@ namespace AssetLock.Editor.Manager
 
 		private string m_projectPath;
 
-		private double m_refreshStartTime;
-		private bool m_refreshing;
+		private bool m_disposed;
 
 		private static UserSetting<string> s_repoSerialized = new(
 			UserSettings,
@@ -41,7 +41,7 @@ namespace AssetLock.Editor.Manager
 
 		public static void Reboot()
 		{
-			Instance = null;
+			Instance.Dispose();
 			Instance = new AssetLockManager();
 		}
 
@@ -65,243 +65,31 @@ namespace AssetLock.Editor.Manager
 			m_lfsProcess = new ProcessWrapper(GitLfsPath);
 
 			EditorApplication.projectWindowItemOnGUI += ProjectWindowGUI.DrawOnProjectWindowGUI;
-			EditorApplication.update += UpdateLoop;
+			EditorApplication.update += EditorLoop;
+			EditorApplication.quitting += Dispose;
 
 			_ = InitGitLfs();
 		}
-
-		private async void UpdateLoop()
-		{
-			if (m_refreshing)
-			{
-				return;
-			}
-			
-			if (m_refreshStartTime + AssetLockSettings.RefreshRate > EditorApplication.timeSinceStartup)
-			{
-				return;
-			}
-			
-			await RefreshAsync();
-		}
-
+		
 		~AssetLockManager()
 		{
-			s_repoSerialized.SetValue(m_lockRepo.Serialize());
+			if (!m_disposed)
+			{
+				Logging.LogWarning("AssetLockManager was not disposed, disposing now.");
+				Dispose();
+			}
+		}
+
+		public void Dispose()
+		{
+			s_repoSerialized.SetValue(m_lockRepo.Serialize(), true);
 			
 			EditorApplication.projectWindowItemOnGUI -= ProjectWindowGUI.DrawOnProjectWindowGUI;
-			EditorApplication.update -= UpdateLoop;
-		}
-		
-
-	#region Controls
-
-		
-
-		internal bool TryGetLockInfoByPath(string path, out LockInfo info)
-		{
-			ThrowIfNotInitialized();
+			EditorApplication.update -= EditorLoop;
+			EditorApplication.quitting -= Dispose;
 			
-			path = NormalizePath(path);
-			info = m_lockRepo.GetByPath(path);
-
-			return info.HasValue;
+			m_disposed = true;
 		}
-
-		internal LockInfo GetOrTrack(string path)
-		{
-			ThrowIfNotInitialized();
-			
-			path = NormalizePath(path);
-			LockInfo info = m_lockRepo.GetByPath(path);
-			Logging.LogVerboseFormat("GetOrTrack:\npath: {0}\nresult: {1}", path, info);
-
-			if (!info.HasValue)
-			{
-				_ = TrackFileAsync(path);
-				info = m_lockRepo.GetByPath(path);
-			}
-			else
-			{
-				IsFileLockedAsync(info.path)
-					.ContinueWith(
-						(task =>
-						{
-							if (task.Result != info.locked)
-							{
-								var l = info;
-								l.locked = task.Result;
-								m_lockRepo.UpdateLock(info, l);
-							}
-						})
-					);
-			}
-
-			return info;
-		}
-
-		internal bool TryGetLockInfoByGuid(string guid, out LockInfo info)
-		{
-			ThrowIfNotInitialized();
-			
-			info = m_lockRepo.GetByGuid(guid);
-
-			return info.HasValue;
-		}
-
-		internal LockInfo GetOrTrackByGuid(string guid)
-		{
-			ThrowIfNotInitialized();
-			
-			LockInfo info = m_lockRepo.GetByGuid(guid);
-
-			if (!info.HasValue)
-			{
-				TrackFileAsync(AssetDatabase.GUIDToAssetPath(guid)).Wait(Constants.DEFAULT_LOCK_TIMEOUT);
-				info = m_lockRepo.GetByGuid(guid);
-			}
-
-			return info;
-		}
-
-		public void Refresh()
-		{
-			ThrowIfNotInitialized();
-			
-			if (m_refreshing)
-			{
-				return;
-			}
-
-			if (m_refreshStartTime + AssetLockSettings.RefreshRate > EditorApplication.timeSinceStartup)
-			{
-				return;
-			}
-
-			RefreshAsync().Wait(Constants.DEFAULT_LOCK_TIMEOUT);
-		}
-
-		internal void ForceRefresh()
-		{
-			ThrowIfNotInitialized();
-			
-			if (m_refreshing)
-			{
-				return;
-			}
-
-			m_refreshStartTime = 0;
-			Refresh();
-		}
-
-		public void SetLockByPath(string path, bool locked)
-		{
-			ThrowIfNotInitialized();
-			
-			path = NormalizePath(path);
-			TrackFileAsync(path)
-				.ContinueWith(
-					async (t) =>
-					{
-						if (locked)
-						{
-							await LockFileAsync(path);
-						}
-						else
-						{
-							await UnlockFileAsync(path);
-						}
-					}
-				);
-		}
-
-		public void UntrackFile(string path)
-		{
-			ThrowIfNotInitialized();
-			
-			path = NormalizePath(path);
-
-			if (m_lockRepo.IsTrackedByPath(path))
-			{
-				_ = UnlockFileAsync(path);
-				m_lockRepo.RemoveLockByPath(path);
-			}
-		}
-
-		internal async Task SetLockAsync(LockInfo info)
-		{
-			ThrowIfNotInitialized();
-			
-			if (!m_lockRepo.IsTracked(info))
-			{
-				await TrackFileAsync(info.path);
-			}
-
-			if (info.locked)
-			{
-				await LockFileAsync(info.path);
-			}
-			else
-			{
-				await UnlockFileAsync(info.path);
-			}
-		}
-
-		internal void SetLock(LockInfo info)
-		{
-			ThrowIfNotInitialized();
-			
-			if (!m_lockRepo.IsTracked(info))
-			{
-				TrackFileAsync(info.path)
-					.ContinueWith(
-						async (t) =>
-						{
-							if (info.locked)
-							{
-								await LockFileAsync(info.path);
-							}
-							else
-							{
-								await UnlockFileAsync(info.path);
-							}
-						}
-					);
-			}
-			else
-			{
-				if (info.locked)
-				{
-					LockFileAsync(info.path).Wait(Constants.DEFAULT_LOCK_TIMEOUT);
-				}
-				else
-				{
-					UnlockFileAsync(info.path).Wait(Constants.DEFAULT_LOCK_TIMEOUT);
-				}
-			}
-		}
-
-		internal void PrintLockRepo()
-		{
-			StringBuilder sb = new();
-
-			int cnt = 0;
-			foreach (var l in m_lockRepo.Locks)
-			{
-				sb.AppendLine('\t' + l.ToString());
-				cnt++;
-			}
-			
-			Logging.LogFormat("Current Lock Cache ({0}):\n{1}", cnt, sb);
-		}
-
-		internal void ResetLockRepo()
-		{
-			m_lockRepo.Reset();
-			Logging.Log("Reset Lock Cache");
-		}
-
-	#endregion
 
 		private void ThrowOnProcessError(ProcessResult result, string msg = "")
 		{
@@ -343,11 +131,29 @@ namespace AssetLock.Editor.Manager
 			}
 		}
 
+		private FileInfo ThrowIfDoesNotExist(string path)
+		{
+			path = NormalizePathOrThrow(path);
+			var file = new FileInfo(path);
+
+			if (!file.Exists)
+			{
+				throw new FileNotFoundException("File does not exist", path);
+			}
+
+			return file;
+		}
+
 		private async Task ParseDirectoryAsync(DirectoryInfo dir, List<DirectoryInfo> dirs)
 		{
 			dirs.Add(dir);
 			foreach (FileInfo file in dir.GetFiles())
 			{
+				if (file.Extension.EndsWith("meta"))
+				{
+					continue;
+				}
+				
 				if (!IsTrackedExtension(file))
 				{
 					continue;
@@ -363,7 +169,7 @@ namespace AssetLock.Editor.Manager
 					continue;
 				}
 
-				await TrackFileAsync(file.FullName);
+				await InternalTrackFileAsync(file);
 			}
 
 			foreach (DirectoryInfo subdir in dir.GetDirectories())

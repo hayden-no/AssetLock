@@ -72,12 +72,18 @@ namespace AssetLock.Editor.UI
 		);
 
 		readonly GUIContent m_quickCheckLabel = new("Quick Check Size", "The size of the quick check buffer");
+		readonly GUIContent m_gitRemoteUrlLabel = new("Git Remote URL", "Remote URL for git operations");
+		readonly GUIContent m_gitLfsServerLabel = new("Git LFS Server", "Server for git-lfs operations");
+		readonly GUIContent m_gitLfsServerLocksLabel = new("Git LFS Server Locks", "Server endpoint for git-lfs lock api operations");
 
 		IEnumerable<GUIContent> GUIContents()
 		{
 			yield return m_configLabel;
 			yield return m_trackedExtensionsLabel;
 			yield return m_quickCheckLabel;
+			yield return m_gitRemoteUrlLabel;
+			yield return m_gitLfsServerLabel;
+			yield return m_gitLfsServerLocksLabel;
 		}
 
 		protected override IEnumerable<string> GetSettingNames()
@@ -95,6 +101,9 @@ namespace AssetLock.Editor.UI
 		{
 			BeginSearchableGroup(m_configLabel, ctx);
 			SearchableNumericField(m_quickCheckLabel, QuickCheckSize, ctx);
+			SearchableStringField(m_gitRemoteUrlLabel, GitRemoteUrl, ctx);
+			SearchableStringField(m_gitLfsServerLabel, GitLfsServerUrl, ctx);
+			SearchableStringField(m_gitLfsServerLocksLabel, GitLfsServerLocksApiUrl, ctx);
 			Space();
 			SearchableStringList(m_trackedExtensionsLabel, TrackedFileEndings, ctx);
 			EndSearchableGroup(m_configLabel, ctx);
@@ -111,6 +120,7 @@ namespace AssetLock.Editor.UI
 		readonly GUIContent m_gitDownloadLabel = new("Download Git", Constants.GIT_DOWNLOAD_URL);
 		readonly GUIContent m_gitLfsExeLabel = new("Git LFS Executable", "Path to git-lfs executable");
 		readonly GUIContent m_gitLfsDownloadLabel = new("Download Git LFS", Constants.GIT_LFS_DOWNLOAD_URL);
+		readonly GUIContent m_gitAuthTokenLabel = new("Git Remote Auth Token", "Remote auth token for git operations");
 
 		readonly GUIContent m_debugLabel = new("Debug");
 		readonly GUIContent m_debugModeLabel = new("Debug Mode", "Enable/disable debug mode");
@@ -119,6 +129,7 @@ namespace AssetLock.Editor.UI
 			"Force Synchronous Process Handling",
 			"Enable/disable asynchronous process handling"
 		);
+		readonly GUIContent m_useHttpLabel = new("Use HTTP", "Enable/disable HTTP for git operations");
 
 		readonly GUIContent m_verboseLoggingLabel = new("Verbose Logging", "Enable/disable verbose logging");
 		readonly GUIContent m_enableProfilingLabel = new("Enable Profiling", "Enable/disable various debug profiling");
@@ -142,8 +153,10 @@ namespace AssetLock.Editor.UI
 			yield return m_gitDownloadLabel;
 			yield return m_gitLfsExeLabel;
 			yield return m_gitLfsDownloadLabel;
+			yield return m_gitAuthTokenLabel;
 			yield return m_debugLabel;
 			yield return m_debugModeLabel;
+			yield return m_useHttpLabel;
 			yield return m_forceSyncLabel;
 			yield return m_verboseLoggingLabel;
 			yield return m_infoLoggingLabel;
@@ -172,6 +185,12 @@ namespace AssetLock.Editor.UI
 			SearchableToggle(m_masterEnableLabel, MasterEnable, ctx);
 			SearchableToggle(m_autoLockLabel, AutoLock, ctx);
 			SearchableNumericField(m_refreshRateLabel, AssetLockSettings.RefreshRate, ctx);
+
+			if (UseHttp)
+			{
+				SearchableStringField(m_gitAuthTokenLabel, GitRemoteAuthToken, ctx);
+			}
+			
 			Space();
 			SearchableFilePicker(
 				m_gitExeLabel,
@@ -208,6 +227,7 @@ namespace AssetLock.Editor.UI
 
 			if (DebugMode)
 			{
+				SearchableToggle(m_useHttpLabel, UseHttp, ctx);
 				SearchableToggle(m_forceSyncLabel, ForceSynchronousProcessHandling, ctx);
 				SearchableToggle(m_enableProfilingLabel, EnableProfiling, ctx);
 				SearchableNumericField(m_profilingMinTimeLabel, ProfilingMinTimeMs, ctx);

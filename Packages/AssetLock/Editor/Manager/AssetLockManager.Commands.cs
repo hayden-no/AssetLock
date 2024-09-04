@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using AssetLock.Editor.UI;
@@ -14,33 +15,88 @@ namespace AssetLock.Editor.Manager
 {
 	public partial class AssetLockManager
 	{
-		enum CommandKind
+		internal enum CommandKind
 		{
 			Track,
 			Untrack,
 			Lock,
-			Unlock
+			Unlock,
+			Update
 		}
 
-		struct Command
+		internal struct Command
 		{
 			public CommandKind Kind;
-			public FileInfo File;
+			public FileReference File;
 			public bool Force;
-			
-			public Task ExecuteAsync()
+
+			public Command(CommandKind kind, FileReference reference, bool force = false)
 			{
-				return Kind switch
+				Kind = kind;
+				File = reference;
+				Force = force;
+			}
+
+			public async Task ExecuteAsync()
+			{
+				if (!File.Exists)
 				{
-					CommandKind.Track => Instance.TrackFileAsync(File.FullName, Force),
-					CommandKind.Untrack => Instance.UntrackFileAsync(File.FullName, Force),
-					CommandKind.Lock => Instance.LockFileAsync(File.FullName),
-					CommandKind.Unlock => Instance.UnlockFileAsync(File.FullName),
-					_ => throw new ArgumentOutOfRangeException()
-				};
+					throw new FileNotFoundException("File not found", File.GitPath);
+				}
+
+				switch (Kind)
+				{
+					case CommandKind.Track:
+						await Track();
+
+						break;
+					case CommandKind.Untrack:
+						await Untrack();
+
+						break;
+					case CommandKind.Lock:
+						await Lock();
+
+						break;
+					case CommandKind.Unlock:
+						await Unlock();
+
+						break;
+					case CommandKind.Update:
+						await Update();
+
+						break;
+					default:
+						throw new ArgumentOutOfRangeException();
+				}
+			}
+
+			private async Task Track()
+			{
+				await Instance.InternalTrackFileAsync(File, Force);
+			}
+
+			private async Task Untrack()
+			{
+				await Instance.InternalUntrackFileAsync(File, Force);
+			}
+
+			private async Task Lock()
+			{
+				await Instance.InternalLockFileAsync(File);
+			}
+
+			private async Task Unlock()
+			{
+				await Instance.InternalUnlockFileAsync(File, Force);
+			}
+
+			private async Task Update()
+			{
+				await Instance.InternalRefreshLockAsync(File);
 			}
 		}
-		
+
 		private async Task InitGitLfs()
 		{
 			const string installCmd = "install";
@@ -58,13 +114,26 @@ namespace AssetLock.Editor.Manager
 			}
 
 			Logging.LogFormat("Git LFS environment: {0}", await m_lfsProcess.RunCommandAsync(envCmd));
+
+			if (string.IsNullOrWhiteSpace(GitWorkingDirectory))
+			{
+				GitWorkingDirectory.SetValue(await GetGitWorkingDirectory());
+			}
+
+			if (string.IsNullOrWhiteSpace(GitRemoteUrl))
+			{
+				var gitRemote = await GetGitRemote();
+				GitRemoteUrl.SetValue(gitRemote);
+				GitLfsServerUrl.SetValue(gitRemote + "/info/lfs");
+				GitLfsServerLocksApiUrl.SetValue(gitRemote + "/info/lfs/locks");
+			}
 		}
 
 		private async Task<string> GetGitUser()
 		{
-			string cmd = "config";
-			string arg1 = "--global";
-			string arg2 = "user.name";
+			const string cmd = "config";
+			const string arg1 = "--global";
+			const string arg2 = "user.name";
 
 			var result = await m_gitProcess.RunCommandAsync(cmd, arg1, arg2);
 			ThrowOnProcessError(result, "failed to get git user");
@@ -72,130 +141,234 @@ namespace AssetLock.Editor.Manager
 			return result.StdOut.Trim();
 		}
 
-		private async Task TrackFileAsync(string path, bool force=false)
+		private async Task<string> GetGitRemote()
+		{
+			const string cmd = "remote";
+			const string arg1 = "-v";
+
+			var result = await m_gitProcess.RunCommandAsync(cmd, arg1);
+			ThrowOnProcessError(result);
+
+			var lines = result.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+			string repo = string.Empty;
+
+			foreach (var line in lines)
+			{
+				if (!line.Contains("(fetch)"))
+				{
+					continue;
+				}
+
+				repo = line.Split('\t')[1]
+					.Split(' ')[0]; // example: origin  https://github.com/hayden-no/AssetLock.git (fetch)
+
+				break;
+			}
+
+			return repo;
+		}
+
+		private async Task<string> GetGitWorkingDirectory()
+		{
+			const string cmd = "rev-parse";
+			const string arg1 = "--show-toplevel";
+
+			var result = await m_gitProcess.RunCommandAsync(cmd, arg1);
+			ThrowOnProcessError(result, "failed to get git working directory");
+
+			return result.StdOut.Trim();
+		}
+
+		private async Task InternalTrackFileAsync(FileReference reference, bool force = false)
 		{
 			const string cmd = "track";
 			const string arg1 = "--filename";
 			const string arg2 = "--lockable";
 
 			ThrowIfNotInitialized();
-			path = NormalizePath(path);
 
-			if (!force && m_lockRepo.GetByPath(path).path == path)
+			if (!force && m_lockRepo.ContainsKey(reference))
 			{
 				// already tracked
-				Logging.LogVerboseFormat("Tried tracking file {0} but it is already tracked", path);
+				Logging.LogVerboseFormat("File already tracked\n{0}\n", reference);
 
 				return;
 			}
 
-			var result = await m_lfsProcess.RunCommandAsync(cmd, arg1, arg2, GetFileArg());
+			var result = await m_lfsProcess.RunCommandAsync(cmd, arg1, arg2, reference.AsProcessArg());
 			ThrowOnProcessError(result);
-			m_lockRepo.AddLock(LockInfo.FromPath(path));
-			Logging.LogVerboseFormat("Tracked file {0}", path);
-
-			string GetFileArg() => $"{NormalizePath(path)}";
+			m_lockRepo[reference] = reference.ToLock();
+			Logging.LogVerboseFormat("Tracked file \n{0}\n", reference);
 		}
 
-		private async Task UntrackFileAsync(string path, bool force = false)
+		private async Task InternalUntrackFileAsync(FileReference reference, bool force = false)
 		{
 			const string cmd = "untrack";
-			
-			ThrowIfNotInitialized();
-			path = NormalizePathOrThrow(path);
 
-			if (!force && !m_lockRepo.GetByPath(path).HasValue)
+			ThrowIfNotInitialized();
+
+			if (!force && !m_lockRepo.ContainsKey(reference))
 			{
 				// not tracked
-				Logging.LogVerboseFormat("Tried untracking file {0} but it is not tracked", path);
-				
+				Logging.LogVerboseFormat("Failed to untrack untracked file \n{0}\n", reference);
+
 				return;
 			}
-			
-			var result = await m_lfsProcess.RunCommandAsync(cmd, GetFileArg());
+
+			var result = await m_lfsProcess.RunCommandAsync(cmd, reference.AsProcessArg());
 			ThrowOnProcessError(result);
-			m_lockRepo.RemoveLockByPath(path);
-			Logging.LogVerboseFormat("Untracked file {0}", path);
-			
-			string GetFileArg() => $"{NormalizePath(path)}";
+			m_lockRepo.Remove(reference);
+			Logging.LogVerboseFormat("Untracked file {0}", reference);
 		}
 
-		private async Task LockFileAsync(string path)
+		private async Task InternalLockFileAsync(FileReference reference)
 		{
 			const string cmd = "lock";
-
 			ThrowIfNotInitialized();
-			path = NormalizePathOrThrow(path);
-			var result = await m_lfsProcess.RunCommandAsync(cmd, GetFileArg());
-			ThrowOnProcessError(result, $"failed to lock file '{path}'");
-			m_lockRepo.SetLockByPath(path, true, m_user, DateTime.Now.ToString());
-			Logging.LogVerboseFormat("Locked file {0}", path);
 
-			string GetFileArg() => $"{NormalizePath(path)}";
+			if (UseHttp)
+			{
+				var response = await CreateLockHttp(reference);
+
+				if (response.Item1)
+				{
+					m_lockRepo.Remove(reference);
+					m_lockRepo[response.Item2] = response.Item2;
+				}
+			}
+			else
+			{
+				var result = await m_lfsProcess.RunCommandAsync(cmd, reference.AsProcessArg());
+				ThrowOnProcessError(result, $"failed to lock file '{reference.GitPath}'");
+				m_lockRepo[reference] = reference.ToLock(
+					true,
+					null,
+					m_user,
+					DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ssZ")
+				);
+			}
+
+			Logging.LogVerboseFormat("Locked file {0}", reference);
 		}
 
-		private async Task UnlockFileAsync(string path)
+		private async Task InternalUnlockFileAsync(FileReference reference, bool force = false)
 		{
 			const string cmd = "unlock";
 
 			ThrowIfNotInitialized();
 
-			path = NormalizePath(path);
+			if (UseHttp)
+			{
+				if (m_lockRepo.TryGetValue(reference, out var info))
+				{
+					var response = await DeleteLockHttp(info, force);
 
-			var result = await m_lfsProcess.RunCommandAsync(cmd, GetFileArg());
-			ThrowOnProcessError(result);
-			m_lockRepo.SetLockByPath(path, false);
-			Logging.LogVerboseFormat("Unlocked file {0}", path);
+					if (response.Item1)
+					{
+						m_lockRepo.Remove(reference);
+						// we know it's no longer locked
+						var l = response.Item2;
+						l.locked = false;
+						m_lockRepo[l] = l;
+					}
+				}
+				else
+				{
+					throw new InvalidOperationException("File is not tracked.");
+				}
+			}
+			else
+			{
+				var result = await m_lfsProcess.RunCommandAsync(cmd, reference.AsProcessArg());
+				ThrowOnProcessError(result);
+				m_lockRepo[reference] = reference.ToLock();
+			}
 
-			string GetFileArg() => $"{NormalizePath(path)}";
+			Logging.LogVerboseFormat("Unlocked file {0}", reference);
 		}
 
-		private async Task<bool> IsFileLockedAsync(string path)
+		private async Task<bool> InternalRefreshLockAsync(FileReference reference)
 		{
 			const string cmd = "locks";
 			const string arg1 = "--path=";
 
 			ThrowIfNotInitialized();
 
-			path = NormalizePath(path);
-
-			var result = await m_lfsProcess.RunCommandAsync(cmd, Constants.JSON_FLAG, GetFileArg());
-			ThrowOnProcessError(result, "failed to check if file is locked");
-			string json = result.StdOut;
-
-			if (string.IsNullOrWhiteSpace(json))
+			if (UseHttp)
 			{
-				m_lockRepo.SetLockByPath(path, false);
-				Logging.LogVerboseFormat("File {0} is not locked", path);
+				var request = new ListLocksRequest() { Path = reference.GitPath };
+				var response = await ListLocksHttp(request);
 
-				return false;
+				if (response.Item1)
+				{
+					foreach (var info in response.Item3)
+					{
+						m_lockRepo[info] = info;
+					}
+
+					return response.Item3.Any();
+				}
+				else
+				{
+					return true;
+				}
+			}
+			else
+			{
+				var result = await m_lfsProcess.RunCommandAsync(cmd, Constants.JSON_FLAG, GetFileArg());
+				ThrowOnProcessError(result, $"failed to check if file is locked\n{reference}\n");
+				string json = result.StdOut;
+
+				if (string.IsNullOrWhiteSpace(json))
+				{
+					m_lockRepo[reference] = reference.ToLock();
+					Logging.LogVerboseFormat("File is not locked \n{0}\n", reference);
+
+					return false;
+				}
+
+				bool locked = false;
+
+				foreach (var info in FromJson(json))
+				{
+					m_lockRepo[info] = info;
+					locked = true;
+
+					Logging.LogVerboseFormat("File is locked by {1} \n{0}\n", reference, info.owner);
+				}
+
+				return locked;
 			}
 
-			bool locked = false;
-
-			foreach (var info in FromJson(json))
-			{
-				m_lockRepo.UpdateOrAddLock(info);
-				locked = true;
-
-				Logging.LogVerboseFormat("File {0} is locked by {1}", path, info.owner);
-			}
-
-			return locked;
-
-			string GetFileArg() => $"{arg1}{NormalizePath(path)}";
+			string GetFileArg() => $"{arg1}{reference.AsProcessArg()}";
 		}
 
-		private async Task<List<LockInfo>> GetAllLocksAsync()
+		private async Task<List<LockInfo>> InternalRefreshAllLocksAsync()
 		{
 			const string cmd = "locks";
 
 			ThrowIfNotInitialized();
 
-			var result = await m_lfsProcess.RunCommandAsync(cmd, Constants.JSON_FLAG);
-			ThrowOnProcessError(result);
+			if (UseHttp)
+			{
+				var response = await ListLocksHttp(new());
 
-			return FromJson(result.StdOut);
+				if (response.Item1)
+				{
+					return response.Item3.ToList();
+				}
+				else
+				{
+					return new();
+				}
+			}
+			else
+			{
+				var result = await m_lfsProcess.RunCommandAsync(cmd, Constants.JSON_FLAG);
+				ThrowOnProcessError(result, "failed to list locks");
+
+				return FromJson(result.StdOut);
+			}
 		}
 	}
 }

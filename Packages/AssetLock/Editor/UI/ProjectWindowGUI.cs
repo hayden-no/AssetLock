@@ -7,17 +7,19 @@ namespace AssetLock.Editor.UI
 {
 	internal static class ProjectWindowGUI
 	{
-		private static readonly GUIContent lockIcon = EditorGUIUtility.IconContent("P4_LockedLocal@2x");
-		private static readonly GUIContent unlockIcon = EditorGUIUtility.IconContent("P4_LockedRemote@2x");
+		private static readonly GUIContent s_lockIcon = EditorGUIUtility.IconContent("P4_LockedLocal@2x");
+		private static readonly GUIContent s_unlockIcon = EditorGUIUtility.IconContent("P4_LockedRemote@2x");
 
 		public static void DrawOnProjectWindowGUI(string guid, Rect selectionrect)
 		{
-			if (Application.isPlaying || Event.current.type != EventType.Repaint || !MasterEnable)
+			if (Application.isPlaying || Event.current.type != EventType.Repaint || !MasterEnable || string
+                .IsNullOrWhiteSpace(guid))
 			{
 				return;
 			}
 
-			if (!AssetLockManager.Instance.TryGetLockInfoByGuid(guid, out var lockInfo))
+			var reference = FileReference.FromGuid(guid);
+			if (!AssetLockManager.Instance.Repo.TryGetValue(reference, out var lockInfo))
 			{
 				return;
 			}
@@ -39,7 +41,7 @@ namespace AssetLock.Editor.UI
 				return;
 			}
 
-			GUIContent icon = lockInfo.locked ? lockIcon : unlockIcon;
+			GUIContent icon = lockInfo.locked ? s_lockIcon : s_unlockIcon;
 			float min = Mathf.Min(selectionrect.width, selectionrect.height);
 			Vector2 iconSize = new Vector2(min / 2, min / 2);
 			Rect iconRect = new Rect(selectionrect.x, selectionrect.y, iconSize.x, iconSize.y);
@@ -87,7 +89,7 @@ namespace AssetLock.Editor.UI
 		}
 
 		[MenuItem("Assets/AssetLock/Lock Asset")]
-		private static async void LockSelected()
+		private static void LockSelected()
 		{
 			Object target = Selection.activeObject;
 
@@ -97,13 +99,7 @@ namespace AssetLock.Editor.UI
 			}
 
 			string path = AssetDatabase.GetAssetPath(target);
-
-			if (AssetLockManager.Instance.TryGetLockInfoByGuid(path, out var lockInfo))
-			{
-				var info = lockInfo;
-				info.locked = true;
-				await AssetLockManager.Instance.SetLockAsync(info);
-			}
+			AssetLockManager.Instance.LockFile(path);
 		}
 
 		[MenuItem("Assets/AssetLock/Lock Asset", true)]
@@ -117,8 +113,9 @@ namespace AssetLock.Editor.UI
 			}
 
 			string path = AssetDatabase.GetAssetPath(target);
+			var reference = FileReference.FromPath(path);
 
-			if (AssetLockManager.Instance.TryGetLockInfoByGuid(path, out var lockInfo))
+			if (AssetLockManager.Instance.Repo.TryGetValue(reference, out var lockInfo))
 			{
 				return lockInfo is { HasValue: true, locked: false };
 			}
@@ -127,7 +124,7 @@ namespace AssetLock.Editor.UI
 		}
 
 		[MenuItem("Assets/AssetLock/Unlock Asset")]
-		private static async void UnlockSelected()
+		private static void UnlockSelected()
 		{
 			Object target = Selection.activeObject;
 
@@ -137,13 +134,7 @@ namespace AssetLock.Editor.UI
 			}
 
 			string path = AssetDatabase.GetAssetPath(target);
-
-			if (AssetLockManager.Instance.TryGetLockInfoByPath(path, out var lockInfo))
-			{
-				var info = lockInfo;
-				info.locked = false;
-				await AssetLockManager.Instance.SetLockAsync(info);
-			}
+			AssetLockManager.Instance.UnlockFile(path);
 		}
 
 		[MenuItem("Assets/AssetLock/Unlock Asset", true)]
@@ -157,8 +148,9 @@ namespace AssetLock.Editor.UI
 			}
 
 			string path = AssetDatabase.GetAssetPath(target);
+			var reference = FileReference.FromPath(path);
 
-			if (AssetLockManager.Instance.TryGetLockInfoByPath(path, out var lockInfo))
+			if (AssetLockManager.Instance.Repo.TryGetValue(reference, out var lockInfo))
 			{
 				return lockInfo is { HasValue: true, locked: true };
 			}

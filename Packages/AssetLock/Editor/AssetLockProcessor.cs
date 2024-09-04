@@ -20,7 +20,7 @@ namespace AssetLock.Editor
 		)
 		{
 			using var profiler = new Logging.Profiler(message: string.Join('\n', assetOrMetaFilePaths));
-			
+
 			if (!MasterEnable)
 			{
 				return true;
@@ -31,12 +31,14 @@ namespace AssetLock.Editor
 
 			foreach (var path in GetAllBinaryPaths(assetOrMetaFilePaths))
 			{
-				var info = AssetLockManager.Instance.GetOrTrack(path);
-
-				if (info is { locked: true, LockedByMe: false })
+				if (!AssetLockManager.Instance.Repo.TryGetValue(path, out var info))
+				{
+					AssetLockManager.Instance.TrackFile(path);
+				}
+				else if (info is { locked: true, LockedByMe: false })
 				{
 					result = false;
-					outNotEditablePaths.Add(path);
+					outNotEditablePaths.Add(path.UnityPath);
 				}
 			}
 
@@ -58,7 +60,7 @@ namespace AssetLock.Editor
 		)
 		{
 			using var profiler = new Logging.Profiler(message: string.Join('\n', assetOrMetaFilePaths));
-			
+
 			if (!MasterEnable)
 			{
 				return true;
@@ -69,12 +71,14 @@ namespace AssetLock.Editor
 
 			foreach (var path in GetAllBinaryPaths(assetOrMetaFilePaths))
 			{
-				var info = AssetLockManager.Instance.GetOrTrack(path);
-
-				if (!info.LockedByMe)
+				if (!AssetLockManager.Instance.Repo.TryGetValue(path, out var info))
+				{
+					AssetLockManager.Instance.TrackFile(path);
+				}
+				else if (!info.LockedByMe)
 				{
 					result = false;
-					outNotEditablePaths.Add(path);
+					outNotEditablePaths.Add(path.UnityPath);
 				}
 			}
 
@@ -84,7 +88,7 @@ namespace AssetLock.Editor
 		private static bool MakeEditable(string[] paths, string prompt, List<string> outNotEditablePaths)
 		{
 			using var profiler = new Logging.Profiler(message: string.Join('\n', paths));
-			
+
 			if (!MasterEnable)
 			{
 				return true;
@@ -95,17 +99,19 @@ namespace AssetLock.Editor
 
 			foreach (var path in GetAllBinaryPaths(paths))
 			{
-				var info = AssetLockManager.Instance.GetOrTrack(path);
-
-				if (info is { locked: true, LockedByMe: false })
+				if (!AssetLockManager.Instance.Repo.TryGetValue(path, out var info))
+				{
+					AssetLockManager.Instance.TrackFile(path);
+				}
+				else if (info is { locked: true, LockedByMe: false })
 				{
 					result = false;
-					outNotEditablePaths.Add(path);
+					outNotEditablePaths.Add(path.UnityPath);
 				}
 				else if (!TryAutoLock(info, "edit"))
 				{
 					result = false;
-					outNotEditablePaths.Add(path);
+					outNotEditablePaths.Add(path.UnityPath);
 				}
 			}
 
@@ -115,7 +121,7 @@ namespace AssetLock.Editor
 		private static string[] OnWillSaveAssets(string[] paths)
 		{
 			using var profiler = new Logging.Profiler(message: string.Join('\n', paths));
-			
+
 			if (!MasterEnable)
 			{
 				return paths;
@@ -126,15 +132,17 @@ namespace AssetLock.Editor
 
 			foreach (var path in GetAllBinaryPaths(paths))
 			{
-				var info = AssetLockManager.Instance.GetOrTrack(path);
-
-				if (info is { locked: true, LockedByMe: false })
+				if (!AssetLockManager.Instance.Repo.TryGetValue(path, out var info))
 				{
-					unsaved.Add(path);
+					AssetLockManager.Instance.TrackFile(path);
+				}
+				else if (info is { locked: true, LockedByMe: false })
+				{
+					unsaved.Add(path.UnityPath);
 				}
 				else if (!TryAutoLock(info, "save"))
 				{
-					unsaved.Add(path);
+					unsaved.Add(path.UnityPath);
 				}
 			}
 
@@ -146,16 +154,27 @@ namespace AssetLock.Editor
 		private static AssetDeleteResult OnWillDeleteAsset(string assetPath, RemoveAssetOptions options)
 		{
 			using var profiler = new Logging.Profiler(message: assetPath);
-			
+
 			if (!MasterEnable)
 			{
 				return AssetDeleteResult.DidNotDelete;
 			}
 
 			HandleRefresh(StatusQueryOptions.UseCachedIfPossible);
-			var info = AssetLockManager.Instance.GetOrTrack(assetPath);
+			var path = FileReference.FromPath(assetPath);
 
-			if (info is { locked: true, LockedByMe: false })
+			if (!ShouldTrack(path))
+			{
+				return AssetDeleteResult.DidNotDelete;
+			}
+
+			if (!AssetLockManager.Instance.Repo.TryGetValue(path, out var info))
+			{
+				AssetLockManager.Instance.TrackFile(path);
+
+				return AssetDeleteResult.FailedDelete;
+			}
+			else if (info is { locked: true, LockedByMe: false })
 			{
 				Logging.LogWarningFormat(
 					"Cannot delete locked asset {0} because it is locked by {1}.",
@@ -176,16 +195,27 @@ namespace AssetLock.Editor
 		private static AssetMoveResult OnWillMoveAsset(string sourcePath, string destinationPath)
 		{
 			using var profiler = new Logging.Profiler(message: sourcePath);
-			
+
 			if (!MasterEnable)
 			{
 				return AssetMoveResult.DidNotMove;
 			}
 
 			HandleRefresh(StatusQueryOptions.UseCachedIfPossible);
-			var info = AssetLockManager.Instance.GetOrTrack(sourcePath);
+			var path = FileReference.FromPath(sourcePath);
+			
+			if (!ShouldTrack(path))
+			{
+				return AssetMoveResult.DidNotMove;
+			}
 
-			if (info is { locked: true, LockedByMe: false })
+			if (!AssetLockManager.Instance.Repo.TryGetValue(path, out var info))
+			{
+				AssetLockManager.Instance.TrackFile(path);
+
+				return AssetMoveResult.FailedMove;
+			}
+			else if (info is { locked: true, LockedByMe: false })
 			{
 				Logging.LogWarningFormat(
 					"Cannot move locked asset {0} because it is locked by {1}.",
@@ -199,20 +229,21 @@ namespace AssetLock.Editor
 			{
 				return AssetMoveResult.FailedMove;
 			}
-
+			
+			AssetLockManager.Instance.RegisterMove(path, destinationPath);
 			return AssetMoveResult.DidNotMove;
 		}
 
 		private static void FileModeChanged(string[] paths, FileMode mode)
 		{
 			using var profiler = new Logging.Profiler(message: string.Join('\n', paths));
-			
+
 			if (!MasterEnable)
 			{
 				return;
 			}
 
-			foreach (var path in paths)
+			foreach (var path in GetAllBinaryPaths(paths))
 			{
 				if ((mode & FileMode.Text) != 0)
 				{
@@ -220,9 +251,9 @@ namespace AssetLock.Editor
 				}
 				else if ((mode & FileMode.Binary) != 0)
 				{
-					AssetLockManager.Instance.GetOrTrack(path);
+					AssetLockManager.Instance.TrackFile(path);
 				}
-				
+
 				Logging.LogVerboseFormat("File mode changed for {0} to {1}", path, mode);
 			}
 		}
@@ -230,7 +261,7 @@ namespace AssetLock.Editor
 		private static void OnStatusUpdated()
 		{
 			using var profiler = new Logging.Profiler();
-			
+
 			if (!MasterEnable)
 			{
 				return;
@@ -239,7 +270,7 @@ namespace AssetLock.Editor
 			_ = AssetLockManager.Instance.RefreshAsync();
 		}
 
-		private static bool TryAutoLock(LockInfo info, string action = "modify")
+		private static bool TryAutoLock(FileReference reference, string action = "modify")
 		{
 			if (!MasterEnable)
 			{
@@ -248,9 +279,8 @@ namespace AssetLock.Editor
 
 			if (AutoLock)
 			{
-				info.locked = true;
-				AssetLockManager.Instance.SetLock(info);
-				Logging.LogFormat("Automatically locked asset {0} because it is binary.", info.path);
+				AssetLockManager.Instance.LockFile(reference);
+				Logging.LogFormat("Automatically locked asset {0} because it is binary.", reference.UnityPath);
 
 				return true;
 			}
@@ -259,7 +289,7 @@ namespace AssetLock.Editor
 				Logging.LogWarningFormat(
 					"Cannot {0} lockable asset {1}.  Please check it out first!",
 					action,
-					info.path
+					reference.UnityPath
 				);
 			}
 
@@ -269,6 +299,7 @@ namespace AssetLock.Editor
 		private static void HandleRefresh(StatusQueryOptions option)
 		{
 			using var profiler = new Logging.Profiler(message: $"Query Type: {option}");
+
 			switch (option)
 			{
 				case StatusQueryOptions.ForceUpdate:

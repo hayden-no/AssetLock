@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Linq;
+using System.Text;
 using AssetLock.Editor.Manager;
 using Newtonsoft.Json;
 using UnityEditor;
@@ -23,40 +25,9 @@ namespace AssetLock.Editor
 		public bool HasValue => !string.IsNullOrEmpty(this.guid);
 		public bool LockedByMe => this.locked && this.owner == AssetLockManager.Instance.User;
 
-		internal static LockInfo FromGuid(string guid)
+		public static implicit operator FileReference(LockInfo lockInfo)
 		{
-			string path = AssetDatabase.GUIDToAssetPath(guid);
-			path = AssetLockUtility.NormalizePath(path);
-
-			return new LockInfo()
-			{
-				guid = guid,
-				path = path,
-				name = Path.GetFileNameWithoutExtension(path),
-				locked = false,
-				owner = null
-			};
-		}
-
-		internal static LockInfo FromPath(string path)
-		{
-			string guid = AssetDatabase.AssetPathToGUID(AssetLockUtility.ToRelativePath(path));
-
-			if (string.IsNullOrEmpty(guid))
-			{
-				throw new Exception(
-					string.Format("Failed to find guid for {0} ({1})", path, AssetLockUtility.ToRelativePath(path))
-				);
-			}
-
-			return new LockInfo()
-			{
-				guid = guid,
-				path = path,
-				name = Path.GetFileNameWithoutExtension(path),
-				locked = false,
-				owner = null
-			};
+			return FileReference.FromLock(lockInfo);
 		}
 
 		public override string ToString()
@@ -75,6 +46,130 @@ namespace AssetLock.Editor
 		}
 	}
 
+	internal readonly struct FileReference
+	{
+		public readonly string AbsolutePath;
+
+		private FileReference(string path)
+		{
+			if (string.IsNullOrWhiteSpace(path))
+			{
+				throw new ArgumentException("Path is null or empty.");
+			}
+
+			path = AssetLockUtility.GetPathWithoutMeta(path);
+			
+			// sanitize path
+			path = path.Replace("\"", string.Empty);
+
+			this.AbsolutePath = Path.GetFullPath(path);
+		}
+
+		public string Name => Path.GetFileNameWithoutExtension(this.AbsolutePath);
+		public string NameWithExtension => Path.GetFileName(this.AbsolutePath);
+		public string UnityPath => AssetLockUtility.ToUnityRelativePath(this.AbsolutePath);
+		public string AssetPath => AssetLockUtility.ToUnityAssetsRelativePath(this.AbsolutePath);
+		public string GitPath => AssetLockUtility.ToGitRelativePath(this.AbsolutePath);
+		public string UnityMetaPath => $"{this.UnityPath}.meta";
+		public string Guid => AssetDatabase.AssetPathToGUID(this.UnityPath);
+		public bool Exists => File.Exists(this.AbsolutePath);
+		public string Extension => Path.GetExtension(this.AbsolutePath);
+
+		public FileStream OpenRead()
+		{
+			return File.OpenRead(this.AbsolutePath);
+		}
+
+		public LockInfo ToLock(bool locked = false, string lockId = null, string owner = null, string lockedAt = null)
+		{
+			return new LockInfo()
+			{
+				guid = this.Guid,
+				path = this.UnityPath,
+				name = Path.GetFileNameWithoutExtension(this.AbsolutePath),
+				locked = locked,
+				lockId = lockId,
+				owner = owner,
+				lockedAt = lockedAt
+			};
+		}
+
+		public string AsProcessArg()
+		{
+			return $"\"{this.GitPath}\"";
+		}
+
+		public static FileReference FromGuid(string guid)
+		{
+			return new FileReference(AssetDatabase.GUIDToAssetPath(guid));
+		}
+
+		public static FileReference FromPath(string path)
+		{
+			return new FileReference(path);
+		}
+
+		public static FileReference FromLock(LockInfo lockInfo)
+		{
+			if (!string.IsNullOrWhiteSpace(lockInfo.guid))
+			{
+				return FromGuid(lockInfo.guid);
+			}
+
+			if (!string.IsNullOrWhiteSpace(lockInfo.path))
+			{
+				return FromPath(lockInfo.path);
+			}
+
+			throw new ArgumentException("LockInfo does not contain a valid path or guid.");
+		}
+
+		public static implicit operator FileReference(FileInfo file)
+		{
+			return new FileReference(file.FullName);
+		}
+
+		public static implicit operator FileInfo(FileReference file)
+		{
+			return new FileInfo(file.AbsolutePath);
+		}
+
+		public override string ToString()
+		{
+			StringBuilder sb = new();
+			sb.AppendLine($"FileReference: {NameWithExtension}");
+			sb.AppendLine($"\tAbsolutePath: {this.AbsolutePath}");
+			sb.AppendLine($"\tGitPath: {this.GitPath}");
+			sb.AppendLine($"\tUnityPath: {this.UnityPath}");
+			sb.AppendLine($"\tAssetPath: {this.AssetPath}");
+			sb.AppendLine($"\tUnityMetaPath: {this.UnityMetaPath}");
+			sb.AppendLine($"\tExists: {this.Exists}");
+			sb.AppendLine($"\tExtension: {this.Extension}");
+
+			if (Exists)
+			{
+				// will throw if the file is not found
+				sb.AppendLine($"\tGuid: {this.Guid}");
+			}
+			else
+			{
+				sb.AppendLine("\tGuid: <file not found>");
+			}
+
+			return sb.ToString();
+		}
+
+		public override bool Equals(object obj)
+		{
+			return obj is FileReference other && this.AbsolutePath == other.AbsolutePath;
+		}
+
+		public override int GetHashCode()
+		{
+			return this.AbsolutePath.GetHashCode();
+		}
+	}
+
 	[JsonObject]
 	internal struct LocksResponseDataJson
 	{
@@ -90,12 +185,7 @@ namespace AssetLock.Editor
 
 		public static implicit operator LockInfo(LocksResponseDataJson data)
 		{
-			var info = LockInfo.FromPath(AssetLockUtility.NormalizePath(data.path));
-			info.lockId = data.id;
-			info.lockedAt = data.locked_at;
-			info.owner = data.name;
-
-			return info;
+			return FileReference.FromPath(data.path).ToLock(true, data.id, data.name, data.locked_at);
 		}
 	}
 

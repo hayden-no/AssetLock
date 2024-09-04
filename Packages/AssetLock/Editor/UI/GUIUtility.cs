@@ -185,6 +185,21 @@ namespace AssetLock.Editor.UI
 				}
 			}
 		}
+		
+		public static void SearchableStringField(GUIContent label, UserSetting<string> setting, string ctx)
+		{
+			if (MatchSearchGroups(ctx, label.text))
+			{
+				EditorGUI.BeginChangeCheck();
+
+				setting.value = EditorGUILayout.TextField(label, setting.value);
+
+				if (EditorGUI.EndChangeCheck())
+				{
+					setting.ApplyModifiedProperties();
+				}
+			}
+		}
 
 		public static void SearchableFilePicker(
 			GUIContent content,

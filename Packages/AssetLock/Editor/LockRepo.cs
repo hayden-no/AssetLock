@@ -1,176 +1,120 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using Newtonsoft.Json;
 using UnityEngine;
 
 namespace AssetLock.Editor
 {
-	internal class LockRepo
+	internal class LockRepo : IDictionary<FileReference, LockInfo>, IReadOnlyDictionary<FileReference, LockInfo>
 	{
-		private DualIndexedDictionary<string, string, LockInfo> m_locks; // guid, path
+		private IDictionary<FileReference, LockInfo> m_locks;
 
-		public IEnumerable<LockInfo> Locks => m_locks;
+		public IEnumerable<LockInfo> Locks => m_locks.Values;
 
 		public LockRepo()
 		{
-			m_locks = new((info => info.guid), (info => info.path));
+			m_locks = new Dictionary<FileReference, LockInfo>();
 		}
 
 		public LockRepo(IEnumerable<LockInfo> locks)
 		{
-			m_locks = new(locks, (info => info.guid), (info => info.path));
+			m_locks = new Dictionary<FileReference, LockInfo>();
 		}
 
 		public static LockRepo Deserialize(string json)
 		{
 			using var profiler = new AssetLockUtility.Logging.Profiler();
-			var locks = JsonUtility.FromJson<LockInfo[]>(json);
+			var locks = JsonConvert.DeserializeObject<LockInfo[]>(json) ?? Array.Empty<LockInfo>();
 			AssetLockUtility.Logging.LogVerboseFormat(
 				"Lock Repo Deserialized {0} locks\nResults:\n\t{1}",
 				locks?.Length ?? 0,
-				locks == null ? "null" : string.Join("\n\t", locks)
+				string.Join("\n\t", locks)
 			);
 
-			return new LockRepo(locks);
+			return new LockRepo(locks.Where(l => l.HasValue).Distinct());
 		}
 
 		public string Serialize()
 		{
-			return JsonUtility.ToJson(Locks.ToArray());
+			string results = JsonConvert.SerializeObject(Locks.ToArray());
+			AssetLockUtility.Logging.LogVerboseFormat("Lock Repo Serialized {0} locks\nResults:\n\t{1}", Locks.Count(), results);
+			return results;
 		}
 
-		public void Reset()
+		public IEnumerator<KeyValuePair<FileReference, LockInfo>> GetEnumerator()
+		{
+			return m_locks.GetEnumerator();
+		}
+
+		IEnumerator IEnumerable.GetEnumerator()
+		{
+			return ((IEnumerable)m_locks).GetEnumerator();
+		}
+
+		public void Add(KeyValuePair<FileReference, LockInfo> item)
+		{
+			m_locks.Add(item);
+		}
+
+		public void Clear()
 		{
 			m_locks.Clear();
 		}
 
-		public void Set(IEnumerable<LockInfo> locks)
+		public bool Contains(KeyValuePair<FileReference, LockInfo> item)
 		{
-			foreach (var info in locks)
-			{
-				m_locks[key2: info.path] = info;
-			}
+			return m_locks.Contains(item);
 		}
 
-		private LockInfo GetOrAddByGuid(string guid)
+		public void CopyTo(KeyValuePair<FileReference, LockInfo>[] array, int arrayIndex)
 		{
-			if (m_locks.TryGetValue(key1: guid, out LockInfo l))
-			{
-				return l;
-			}
-
-			l = LockInfo.FromGuid(guid);
-			m_locks.Add(l);
-
-			return l;
+			m_locks.CopyTo(array, arrayIndex);
 		}
 
-		private LockInfo GetOrAddByPath(string path)
+		public bool Remove(KeyValuePair<FileReference, LockInfo> item)
 		{
-			if (m_locks.TryGetValue(key2: path, out LockInfo l))
-			{
-				return l;
-			}
-
-			l = LockInfo.FromPath(path);
-			m_locks.Add(l);
-
-			return l;
+			return m_locks.Remove(item);
 		}
 
-		public LockInfo GetByGuid(string guid)
+		public int Count => m_locks.Count;
+
+		public bool IsReadOnly => m_locks.IsReadOnly;
+
+		public void Add(FileReference key, LockInfo value)
 		{
-			return m_locks.TryGetValue(key1: guid, out LockInfo l) ? l : default;
+			m_locks.Add(key, value);
 		}
 
-		public LockInfo GetByPath(string path)
+		public bool ContainsKey(FileReference key)
 		{
-			return m_locks.TryGetValue(key2: path, out LockInfo l) ? l : default;
+			return m_locks.ContainsKey(key);
 		}
 
-		public bool IsTracked(LockInfo lockInfo)
+		public bool Remove(FileReference key)
 		{
-			return m_locks.Contains(lockInfo);
+			return m_locks.Remove(key);
 		}
 
-		public bool IsTrackedByGuid(string guid)
+		public bool TryGetValue(FileReference key, out LockInfo value)
 		{
-			return m_locks.ContainsKey(key1: guid);
+			return m_locks.TryGetValue(key, out value);
 		}
 
-		public bool IsTrackedByPath(string path)
+		public LockInfo this[FileReference key]
 		{
-			return m_locks.ContainsKey(key2: path);
+			get => m_locks[key];
+			set => m_locks[key] = value;
 		}
 
-		public void UpdateLock(LockInfo old, LockInfo newValue)
-		{
-			m_locks.Remove(old);
-			m_locks.Add(newValue);
-		}
+		IEnumerable<FileReference> IReadOnlyDictionary<FileReference, LockInfo>.Keys => Keys;
 
-		public void UpdateOrAddLock(LockInfo lockInfo)
-		{
-			if (m_locks.TryGetValue(key1: lockInfo.guid, out LockInfo l))
-			{
-				UpdateLock(l, lockInfo);
-			}
-			else
-			{
-				AddLock(lockInfo);
-			}
-		}
+		IEnumerable<LockInfo> IReadOnlyDictionary<FileReference, LockInfo>.Values => Values;
 
-		public void RemoveLock(LockInfo lockInfo)
-		{
-			m_locks.Remove(lockInfo);
-		}
+		public ICollection<FileReference> Keys => m_locks.Keys;
 
-		public void RemoveLockByPath(string path)
-		{
-			m_locks.Remove(key2: path);
-		}
-
-		public void RemoveLockByGuid(string guid)
-		{
-			m_locks.Remove(key1: guid);
-		}
-
-		public void AddLock(LockInfo lockInfo)
-		{
-			m_locks.Add(lockInfo);
-			AssetLockUtility.Logging.LogVerboseFormat("Added Lock: {0}", lockInfo);
-		}
-
-		public void SetLockByPath(
-			string path,
-			bool locked,
-			string owner = null,
-			string lockedAt = null,
-			string lockId = null
-		)
-		{
-			LockInfo l = GetOrAddByPath(path);
-			l.locked = locked;
-			l.owner = owner;
-			l.lockedAt = lockedAt;
-			l.lockId = lockId;
-			m_locks[key2: path] = l;
-		}
-
-		public void SetLockByGuid(
-			string guid,
-			bool locked,
-			string owner = null,
-			string lockedAt = null,
-			string lockId = null
-		)
-		{
-			LockInfo l = GetOrAddByGuid(guid);
-			l.locked = locked;
-			l.owner = owner;
-			l.lockedAt = lockedAt;
-			l.lockId = lockId;
-			m_locks[key1: guid] = l;
-		}
+		public ICollection<LockInfo> Values => m_locks.Values;
 	}
 }
