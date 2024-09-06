@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using AssetLock.Editor.UI;
@@ -29,6 +30,12 @@ namespace AssetLock.Editor.Manager
 		private string m_projectPath;
 
 		private bool m_disposed;
+		
+		public int TrackedCount => m_lockRepo.Count;
+		public int LockedCount => m_lockRepo.Locks.Count(l => l.locked);
+		public int LockedByMeCount => m_lockRepo.Locks.Count(l => l is { locked: true, LockedByMe: true });
+		public int LockedByOthersCount => m_lockRepo.Locks.Count(l => l is { locked: true, LockedByMe: false });
+		public int UnlockedCount => m_lockRepo.Locks.Count(l => !l.locked);
 
 		private static UserSetting<string> s_repoSerialized = new(
 			UserSettings,

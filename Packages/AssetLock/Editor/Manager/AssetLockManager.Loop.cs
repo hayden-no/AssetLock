@@ -62,11 +62,7 @@ namespace AssetLock.Editor.Manager
 			await HandleCommandsAsync();
 			
 			var locks = await InternalRefreshAllLocksAsync();
-
-			foreach (var info in locks)
-			{
-				m_lockRepo[info] = info;
-			}
+			m_lockRepo.Update(locks);
 			
 			m_refreshTimer = AssetLockSettings.RefreshRate;
 			Refreshing = false;

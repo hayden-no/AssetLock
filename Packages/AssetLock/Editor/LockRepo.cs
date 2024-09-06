@@ -109,6 +109,23 @@ namespace AssetLock.Editor
 			set => m_locks[key] = value;
 		}
 
+		public void Update(IEnumerable<LockInfo> infos)
+		{
+			var locks = infos.ToDictionary((l => (FileReference)l));
+			foreach (var value in m_locks.Values.ToList())
+			{
+				if (locks.TryGetValue(value, out var info))
+				{
+					m_locks[value] = info;
+				}
+				else
+				{
+					value.Reset();
+					m_locks[value] = value;
+				}
+			}
+		}
+
 		IEnumerable<FileReference> IReadOnlyDictionary<FileReference, LockInfo>.Keys => Keys;
 
 		IEnumerable<LockInfo> IReadOnlyDictionary<FileReference, LockInfo>.Values => Values;

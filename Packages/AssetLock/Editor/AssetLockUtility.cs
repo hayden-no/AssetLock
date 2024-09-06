@@ -37,6 +37,10 @@ namespace AssetLock.Editor
 
 			public const string PROJECT_SETTINGS_PROVIDER_PATH = "Project/AssetLock";
 			public const string USER_SETTINGS_PROVIDER_PATH = "Preferences/AssetLock";
+			
+			public const string BROWSER_MENU_PATH = "Window/" + BROWSER_TITLE;
+			public const string BROWSER_TITLE = "Asset Lock Browser";
+			public const string BROWSER_ICON = "AssemblyLock";
 
 			public const string SETTINGS_TITLE = "AssetLock";
 
@@ -45,7 +49,7 @@ namespace AssetLock.Editor
 				";" +
 				Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User);
 
-			public const int DEFAULT_LOCK_TIMEOUT = 1000;
+			public const int DEFAULT_LOCK_TIMEOUT = 2500;
 		}
 
 		public static class Logging

@@ -289,5 +289,23 @@ namespace AssetLock.Editor.UI
 		{
 			GUILayout.Space(EditorGUI.indentLevel * 15);
 		}
+
+		public static void LabelAndToggleButton(GUIContent label, UserSetting<bool> toggle)
+		{
+			GUIContent buttonLabel = toggle.value ? new GUIContent("ON", $"Click to disable") : new GUIContent("OFF", $"Click to enable");
+			GUIStyle buttonStyle = toggle.value ? new GUIStyle(EditorStyles.miniButton) { normal = { textColor = Color.green } } : new GUIStyle(EditorStyles.miniButton) { normal = { textColor = Color.red } };
+			
+			using (new EditorGUILayout.HorizontalScope())
+			{
+				Indent();
+				Label(label);
+				FlexibleSpace();
+
+				if (Button(buttonLabel, buttonStyle))
+				{
+					toggle.SetValue(!toggle.value);
+				}
+			}
+		}
 	}
 }

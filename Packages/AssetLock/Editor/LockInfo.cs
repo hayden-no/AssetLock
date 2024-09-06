@@ -30,6 +30,14 @@ namespace AssetLock.Editor
 			return FileReference.FromLock(lockInfo);
 		}
 
+		public void Reset()
+		{
+			locked = false;
+			lockId = null;
+			owner = null;
+			lockedAt = null;
+		}
+
 		public override string ToString()
 		{
 			if (!HasValue)

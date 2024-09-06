@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -34,6 +35,11 @@ namespace AssetLock.Editor.Manager
 		{
 			ThrowIfNotInitialized();
 
+			if (m_disposed)
+			{
+				return;
+			}
+
 			if (Refreshing)
 			{
 				SpinWait.SpinUntil(() => !Refreshing);
@@ -41,7 +47,7 @@ namespace AssetLock.Editor.Manager
 				return;
 			}
 
-			InnerLoopAsync().Wait();
+			InnerLoopAsync().Wait(Constants.DEFAULT_LOCK_TIMEOUT);
 		}
 
 		public async Task ParseAllAsync()
@@ -180,6 +186,16 @@ namespace AssetLock.Editor.Manager
 			var destFile = FileReference.FromPath(dest);
 			m_lockRepo.Remove(source);
 			m_lockRepo[destFile] = destFile.ToLock(temp.locked, temp.lockId, temp.owner, temp.lockedAt);
+		}
+
+		public void UnlockAll()
+		{
+			ThrowIfNotInitialized();
+
+			foreach (var info in Repo.Values.Where(l => l.LockedByMe))
+			{
+				UnlockFile(info);
+			}
 		}
 
 		internal void PrintLockRepo()
