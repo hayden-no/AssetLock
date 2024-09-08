@@ -1,15 +1,8 @@
-﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.IO;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using AssetLock.Editor.UI;
 using Newtonsoft.Json;
-using UnityEditor;
-using UnityEditor.SettingsManagement;
-using UnityEngine;
 using UnityEngine.Networking;
 using static AssetLock.Editor.AssetLockUtility;
 using static AssetLock.Editor.AssetLockSettings;
@@ -217,7 +210,7 @@ namespace AssetLock.Editor.Manager
 			}
 		}
 
-		private void HandleUnknownError(UnityWebRequest request)
+		private static void HandleUnknownError(UnityWebRequest request)
 		{
 			Logging.LogErrorFormat("[HTTP] Failed to access remote \n{0}\n", GetWebRequestLogMessage(request));
 			Logging.LogWarning("Disabling HTTP mode.");
@@ -367,11 +360,8 @@ namespace AssetLock.Editor.Manager
 
 				if (!string.IsNullOrWhiteSpace(Path))
 				{
-					if (!any)
-					{
-						sb.Append("?");
-						any = true;
-					}
+					sb.Append("?");
+					any = true;
 
 					sb.Append($"{pathKey}={Path}");
 				}

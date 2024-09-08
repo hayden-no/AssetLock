@@ -5,12 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using AssetLock.Editor.UI;
-using UnityEditor;
-using UnityEditor.SettingsManagement;
-using UnityEngine;
 using static AssetLock.Editor.AssetLockUtility;
-using static AssetLock.Editor.AssetLockSettings;
 
 namespace AssetLock.Editor.Manager
 {

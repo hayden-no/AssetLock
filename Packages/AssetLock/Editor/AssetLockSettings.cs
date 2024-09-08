@@ -3,7 +3,6 @@ using System.Linq;
 using AssetLock.Editor.UI;
 using UnityEditor;
 using UnityEditor.SettingsManagement;
-using UnityEngine;
 using static AssetLock.Editor.AssetLockUtility;
 
 namespace AssetLock.Editor

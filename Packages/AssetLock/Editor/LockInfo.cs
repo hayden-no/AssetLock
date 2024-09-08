@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
-using System.Linq;
 using System.Text;
 using AssetLock.Editor.Manager;
 using Newtonsoft.Json;
@@ -181,25 +180,25 @@ namespace AssetLock.Editor
 	[JsonObject]
 	internal struct LocksResponseDataJson
 	{
-		[JsonProperty("id")] public string id;
+		[JsonProperty("id")] public string ID;
 
-		[JsonProperty("path")] public string path;
+		[JsonProperty("path")] public string Path;
 
-		[JsonProperty("locked_at")] public string locked_at;
+		[JsonProperty("locked_at")] public string LockedAt;
 
-		[JsonProperty("owner")] public LocksResponseOwnerDataJson owner;
+		[JsonProperty("owner")] public LocksResponseOwnerDataJson Owner;
 
-		public string name => this.owner.name;
+		public string Name => this.Owner.Name;
 
 		public static implicit operator LockInfo(LocksResponseDataJson data)
 		{
-			return FileReference.FromPath(data.path).ToLock(true, data.id, data.name, data.locked_at);
+			return FileReference.FromPath(data.Path).ToLock(true, data.ID, data.Name, data.LockedAt);
 		}
 	}
 
 	[JsonObject]
 	internal struct LocksResponseOwnerDataJson
 	{
-		[JsonProperty("name")] public string name;
+		[JsonProperty("name")] public string Name;
 	}
 }

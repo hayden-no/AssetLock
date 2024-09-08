@@ -4,11 +4,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
-using UnityEditor;
-using UnityEditor.SettingsManagement;
 using UnityEngine;
 using static AssetLock.Editor.AssetLockSettings;
 
@@ -139,8 +136,8 @@ namespace AssetLock.Editor
 
 			public struct Profiler : IDisposable
 			{
-				private Stopwatch m_stopwatch;
-				private string m_name;
+				private readonly Stopwatch m_stopwatch;
+				private readonly string m_name;
 				private string m_message;
 
 				public Profiler([CallerMemberName] string callerName = null)
@@ -201,7 +198,7 @@ namespace AssetLock.Editor
 			}
 		}
 
-		public static class ControlChars
+		private static class ControlChars
 		{
 			public const char NUL = (char)0; // Null
 			public const char BS = (char)8; // Backspace
@@ -241,7 +238,7 @@ namespace AssetLock.Editor
 				return false;
 			}
 
-			return IsBinary(info);
+			return IsBinary(info, QuickCheckSize);
 		}
 
 		// https://stackoverflow.com/questions/910873/how-can-i-determine-if-a-file-is-binary-or-text-in-c
@@ -273,8 +270,8 @@ namespace AssetLock.Editor
 
 		public static bool IsUnityYaml(FileReference info)
 		{
-			string line1 = null;
-			string line2 = null;
+			string line1;
+			string line2;
 
 			using (var fs = info.OpenRead())
 			{

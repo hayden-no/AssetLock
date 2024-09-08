@@ -19,16 +19,13 @@ namespace AssetLock.Editor.UI
 		protected AbstractSettingsProvider(string path, SettingsScope scope, string[] keywords = null)
 			: base(path, scope, keywords)
 		{
-			base.guiHandler = ContentGUI;
-			base.titleBarGuiHandler = TitleGUI;
-			base.footerBarGuiHandler = FooterGUI;
-			base.hasSearchInterestHandler = HasSearchContext;
+			guiHandler = ContentGUI;
+			titleBarGuiHandler = TitleGUI;
+			footerBarGuiHandler = FooterGUI;
+			hasSearchInterestHandler = HasSearchContext;
 		}
 
-		protected virtual void TitleGUI()
-		{
-			
-		}
+		protected virtual void TitleGUI() { }
 
 		protected abstract void ContentGUI(string ctx);
 
@@ -74,7 +71,11 @@ namespace AssetLock.Editor.UI
 		readonly GUIContent m_quickCheckLabel = new("Quick Check Size", "The size of the quick check buffer");
 		readonly GUIContent m_gitRemoteUrlLabel = new("Git Remote URL", "Remote URL for git operations");
 		readonly GUIContent m_gitLfsServerLabel = new("Git LFS Server", "Server for git-lfs operations");
-		readonly GUIContent m_gitLfsServerLocksLabel = new("Git LFS Server Locks", "Server endpoint for git-lfs lock api operations");
+
+		readonly GUIContent m_gitLfsServerLocksLabel = new(
+			"Git LFS Server Locks",
+			"Server endpoint for git-lfs lock api operations"
+		);
 
 		IEnumerable<GUIContent> GUIContents()
 		{
@@ -129,6 +130,7 @@ namespace AssetLock.Editor.UI
 			"Force Synchronous Process Handling",
 			"Enable/disable asynchronous process handling"
 		);
+
 		readonly GUIContent m_useHttpLabel = new("Use HTTP", "Enable/disable HTTP for git operations");
 
 		readonly GUIContent m_verboseLoggingLabel = new("Verbose Logging", "Enable/disable verbose logging");
@@ -190,7 +192,7 @@ namespace AssetLock.Editor.UI
 			{
 				SearchableStringField(m_gitAuthTokenLabel, GitRemoteAuthToken, ctx);
 			}
-			
+
 			Space();
 			SearchableFilePicker(
 				m_gitExeLabel,
@@ -240,7 +242,7 @@ namespace AssetLock.Editor.UI
 					SearchableButton(m_rebootLabel, ctx, () => AssetLockManager.Reboot());
 					SearchableButton(m_printLocksLabel, ctx, () => AssetLockManager.Instance.PrintLockRepo());
 					SearchableButton(m_clearLocksLabel, ctx, () => AssetLockManager.Instance.ResetLockRepo());
-					SearchableButton(m_parseAllAssetsLabel, ctx,  () => _ = AssetLockManager.Instance.ParseAllAsync());
+					SearchableButton(m_parseAllAssetsLabel, ctx, () => _ = AssetLockManager.Instance.ParseAllAsync());
 				}
 			}
 

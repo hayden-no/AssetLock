@@ -1,16 +1,14 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using Newtonsoft.Json;
-using UnityEngine;
 
 namespace AssetLock.Editor
 {
 	internal class LockRepo : IDictionary<FileReference, LockInfo>, IReadOnlyDictionary<FileReference, LockInfo>
 	{
-		private IDictionary<FileReference, LockInfo> m_locks;
+		private readonly IDictionary<FileReference, LockInfo> m_locks;
 
 		public IEnumerable<LockInfo> Locks => m_locks.Values;
 

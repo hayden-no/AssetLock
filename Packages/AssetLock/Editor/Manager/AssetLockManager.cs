@@ -138,19 +138,6 @@ namespace AssetLock.Editor.Manager
 			}
 		}
 
-		private FileInfo ThrowIfDoesNotExist(string path)
-		{
-			path = NormalizePathOrThrow(path);
-			var file = new FileInfo(path);
-
-			if (!file.Exists)
-			{
-				throw new FileNotFoundException("File does not exist", path);
-			}
-
-			return file;
-		}
-
 		private async Task ParseDirectoryAsync(DirectoryInfo dir, List<DirectoryInfo> dirs)
 		{
 			dirs.Add(dir);
@@ -171,7 +158,7 @@ namespace AssetLock.Editor.Manager
 					continue;
 				}
 
-				if (!IsBinary(file))
+				if (!IsBinary(file, QuickCheckSize))
 				{
 					continue;
 				}

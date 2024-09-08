@@ -1,14 +1,7 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.IO;
-using System.Text;
+﻿using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
-using AssetLock.Editor.UI;
 using UnityEditor;
-using UnityEditor.SettingsManagement;
-using UnityEngine;
 using static AssetLock.Editor.AssetLockUtility;
 using static AssetLock.Editor.AssetLockSettings;
 

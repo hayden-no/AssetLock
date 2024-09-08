@@ -10,7 +10,7 @@ namespace AssetLock.Editor.UI
 		private static readonly GUIContent s_lockIcon = EditorGUIUtility.IconContent("P4_LockedLocal@2x");
 		private static readonly GUIContent s_unlockIcon = EditorGUIUtility.IconContent("P4_LockedRemote@2x");
 
-		public static void DrawOnProjectWindowGUI(string guid, Rect selectionrect)
+		public static void DrawOnProjectWindowGUI(string guid, Rect selectionRect)
 		{
 			if (Application.isPlaying || Event.current.type != EventType.Repaint || !MasterEnable || string
                 .IsNullOrWhiteSpace(guid))
@@ -24,17 +24,17 @@ namespace AssetLock.Editor.UI
 				return;
 			}
 
-			if (IsListView(selectionrect) && !IsListSubItem(selectionrect))
+			if (IsListView(selectionRect) && !IsListSubItem(selectionRect))
 			{
-				DrawListView(selectionrect, lockInfo);
+				DrawListView(selectionRect, lockInfo);
 			}
-			else if (!IsListView(selectionrect))
+			else if (!IsListView(selectionRect))
 			{
-				DrawIconView(selectionrect, lockInfo);
+				DrawIconView(selectionRect, lockInfo);
 			}
 		}
 
-		private static void DrawIconView(Rect selectionrect, LockInfo lockInfo)
+		private static void DrawIconView(Rect selectionRect, LockInfo lockInfo)
 		{
 			if (!lockInfo.HasValue)
 			{
@@ -42,13 +42,13 @@ namespace AssetLock.Editor.UI
 			}
 
 			GUIContent icon = lockInfo.locked ? s_lockIcon : s_unlockIcon;
-			float min = Mathf.Min(selectionrect.width, selectionrect.height);
+			float min = Mathf.Min(selectionRect.width, selectionRect.height);
 			Vector2 iconSize = new Vector2(min / 2, min / 2);
-			Rect iconRect = new Rect(selectionrect.x, selectionrect.y, iconSize.x, iconSize.y);
+			Rect iconRect = new Rect(selectionRect.x, selectionRect.y, iconSize.x, iconSize.y);
 			GUI.DrawTexture(iconRect, icon.image, ScaleMode.ScaleToFit);
 		}
 
-		private static void DrawListView(Rect selectionrect, LockInfo lockInfo)
+		private static void DrawListView(Rect selectionRect, LockInfo lockInfo)
 		{
 			if (!lockInfo.HasValue)
 			{
@@ -60,8 +60,8 @@ namespace AssetLock.Editor.UI
 			);
 			Vector2 contentSize = EditorStyles.label.CalcSize(content);
 			Rect contentRect = new Rect(
-				selectionrect.x + selectionrect.width - contentSize.x - selectionrect.width / 10,
-				selectionrect.y + (selectionrect.height - contentSize.y) / 2,
+				selectionRect.x + selectionRect.width - contentSize.x - selectionRect.width / 10,
+				selectionRect.y + (selectionRect.height - contentSize.y) / 2,
 				contentSize.x,
 				contentSize.y
 			);

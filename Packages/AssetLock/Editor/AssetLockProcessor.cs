@@ -1,10 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using AssetLock.Editor.Manager;
 using UnityEditor;
-using UnityEditor.SettingsManagement;
 using static AssetLock.Editor.AssetLockSettings;
 using static AssetLock.Editor.AssetLockUtility;
 using FileMode = UnityEditor.VersionControl.FileMode;
