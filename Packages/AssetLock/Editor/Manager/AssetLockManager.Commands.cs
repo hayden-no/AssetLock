@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using AssetLock.Editor.Data;
 using static AssetLock.Editor.AssetLockUtility;
 using static AssetLock.Editor.AssetLockSettings;
 
@@ -10,7 +11,7 @@ namespace AssetLock.Editor.Manager
 {
 	public partial class AssetLockManager
 	{
-		internal enum CommandKind
+		private enum CommandKind
 		{
 			Track,
 			Untrack,
@@ -19,7 +20,7 @@ namespace AssetLock.Editor.Manager
 			Update
 		}
 
-		internal struct Command
+		private struct Command
 		{
 			public CommandKind Kind;
 			public FileReference File;
@@ -92,6 +93,9 @@ namespace AssetLock.Editor.Manager
 			}
 		}
 
+		/// <summary>
+		/// Initializes the Git LFS process and sets the user and remote URL.
+		/// </summary>
 		private async Task InitGitLfs()
 		{
 			const string installCmd = "install";
@@ -122,8 +126,17 @@ namespace AssetLock.Editor.Manager
 				GitLfsServerUrl.SetValue(gitRemote + "/info/lfs");
 				GitLfsServerLocksApiUrl.SetValue(gitRemote + "/info/lfs/locks");
 			}
+
+			if (ParseFilesOnStartup)
+			{
+				ParseAll();
+			}
 		}
 
+		/// <summary>
+		/// Gets the username from the global git configuration.
+		/// </summary>
+		/// <returns>git username</returns>
 		private async Task<string> GetGitUser()
 		{
 			const string cmd = "config";
@@ -136,6 +149,10 @@ namespace AssetLock.Editor.Manager
 			return result.StdOut.Trim();
 		}
 
+		/// <summary>
+		/// Gets the remote URL for the git repository.
+		/// </summary>
+		/// <returns>The remote URL</returns>
 		private async Task<string> GetGitRemote()
 		{
 			const string cmd = "remote";
@@ -163,6 +180,10 @@ namespace AssetLock.Editor.Manager
 			return repo;
 		}
 
+		/// <summary>
+		/// Gets the working directory of the git repository.
+		/// </summary>
+		/// <returns>The working git directory</returns>
 		private async Task<string> GetGitWorkingDirectory()
 		{
 			const string cmd = "rev-parse";
@@ -174,6 +195,12 @@ namespace AssetLock.Editor.Manager
 			return result.StdOut.Trim();
 		}
 
+		/// <summary>
+		/// Internal method used by the AssetLockManager class to track a file for Git LFS.
+		/// </summary>
+		/// <param name="reference">The file reference of the file to track.</param>
+		/// <param name="force">Optional. When true, ignores in memory repo. Default value is false.</param>
+		/// <returns>A Task representing the asynchronous operation.</returns>
 		private async Task InternalTrackFileAsync(FileReference reference, bool force = false)
 		{
 			const string cmd = "track";
@@ -196,6 +223,12 @@ namespace AssetLock.Editor.Manager
 			Logging.LogVerboseFormat("Tracked file \n{0}\n", reference);
 		}
 
+		/// <summary>
+		/// Untracks a file in Git LFS. If the file is not being tracked, it will log a message and return.
+		/// </summary>
+		/// <param name="reference">The file reference.</param>
+		/// <param name="force">Optional. When true, ignores in memory repo. Default value is false.</param>
+		/// <returns>A Task representing the asynchronous operation.</returns>
 		private async Task InternalUntrackFileAsync(FileReference reference, bool force = false)
 		{
 			const string cmd = "untrack";
@@ -216,6 +249,11 @@ namespace AssetLock.Editor.Manager
 			Logging.LogVerboseFormat("Untracked file {0}", reference);
 		}
 
+		/// <summary>
+		/// Locks a file asynchronously.
+		/// </summary>
+		/// <param name="reference">The reference to the file to be locked.</param>
+		/// <returns>A task representing the asynchronous operation.</returns>
 		private async Task InternalLockFileAsync(FileReference reference)
 		{
 			const string cmd = "lock";
@@ -246,9 +284,16 @@ namespace AssetLock.Editor.Manager
 			Logging.LogVerboseFormat("Locked file {0}", reference);
 		}
 
+		/// <summary>
+		/// Unlocks a file asynchronously.
+		/// </summary>
+		/// <param name="reference">The file reference.</param>
+		/// <param name="force">Optional. Specifies whether to force the unlock. Default value is false.</param>
+		/// <returns>A task representing the unlocking operation.</returns>
 		private async Task InternalUnlockFileAsync(FileReference reference, bool force = false)
 		{
 			const string cmd = "unlock";
+			const string frc = "--force";
 
 			ThrowIfNotInitialized();
 
@@ -274,7 +319,7 @@ namespace AssetLock.Editor.Manager
 			}
 			else
 			{
-				var result = await m_lfsProcess.RunCommandAsync(cmd, reference.AsProcessArg());
+				var result = await m_lfsProcess.RunCommandAsync(cmd, force ? frc : string.Empty, reference.AsProcessArg());
 				ThrowOnProcessError(result);
 				m_lockRepo[reference] = reference.ToLock();
 			}
@@ -282,6 +327,11 @@ namespace AssetLock.Editor.Manager
 			Logging.LogVerboseFormat("Unlocked file {0}", reference);
 		}
 
+		/// <summary>
+		/// Refreshes the lock status of a given file.
+		/// </summary>
+		/// <param name="reference">The file reference.</param>
+		/// <returns>A boolean indicating whether the file is locked or not.</returns>
 		private async Task<bool> InternalRefreshLockAsync(FileReference reference)
 		{
 			const string cmd = "locks";
@@ -338,6 +388,10 @@ namespace AssetLock.Editor.Manager
 			string GetFileArg() => $"{arg1}{reference.AsProcessArg()}";
 		}
 
+		/// <summary>
+		/// Retrieves all locks asynchronously from the Git LFS process.
+		/// </summary>
+		/// <returns>A task that represents the asynchronous operation. The task result contains a List of LockInfo objects representing the retrieved locks.</returns>
 		private async Task<List<LockInfo>> InternalRefreshAllLocksAsync()
 		{
 			const string cmd = "locks";

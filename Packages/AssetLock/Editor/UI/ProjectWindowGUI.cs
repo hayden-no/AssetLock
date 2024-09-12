@@ -1,10 +1,16 @@
-﻿using AssetLock.Editor.Manager;
+﻿using System.IO;
+using AssetLock.Editor.Data;
+using AssetLock.Editor.Manager;
 using UnityEditor;
 using UnityEngine;
 using static AssetLock.Editor.AssetLockSettings;
+using static AssetLock.Editor.AssetLockUtility;
 
 namespace AssetLock.Editor.UI
 {
+	/// <summary>
+	/// Handles the GUI for the Project Window, including context menus.
+	/// </summary>
 	internal static class ProjectWindowGUI
 	{
 		private static readonly GUIContent s_lockIcon = EditorGUIUtility.IconContent("P4_LockedLocal@2x");
@@ -12,13 +18,16 @@ namespace AssetLock.Editor.UI
 
 		public static void DrawOnProjectWindowGUI(string guid, Rect selectionRect)
 		{
-			if (Application.isPlaying || Event.current.type != EventType.Repaint || !MasterEnable || string
-                .IsNullOrWhiteSpace(guid))
+			if (Application.isPlaying ||
+				Event.current.type != EventType.Repaint ||
+				!MasterEnable ||
+				string.IsNullOrWhiteSpace(guid))
 			{
 				return;
 			}
 
 			var reference = FileReference.FromGuid(guid);
+
 			if (!AssetLockManager.Instance.Repo.TryGetValue(reference, out var lockInfo))
 			{
 				return;
@@ -70,107 +79,174 @@ namespace AssetLock.Editor.UI
 
 		private static bool IsListView(Rect itemView)
 		{
-			if (itemView.height < 40)
-			{
-				return true;
-			}
-
-			return false;
+			return itemView.height < 40;
 		}
 
 		private static bool IsListSubItem(Rect itemView)
 		{
-			if (itemView.x > 15)
-			{
-				return true;
-			}
-
-			return false;
+			return itemView.x > 15;
 		}
 
-		[MenuItem("Assets/AssetLock/Lock Asset")]
-		private static void LockSelected()
+		private static bool Get(out string path)
 		{
 			Object target = Selection.activeObject;
 
 			if (!target)
 			{
-				return;
+				path = default;
+
+				return false;
+			}
+
+			path = AssetDatabase.GetAssetPath(target);
+
+			return true;
+		}
+
+		private static bool Get(out FileReference reference)
+		{
+			Object target = Selection.activeObject;
+
+			if (!target)
+			{
+				reference = default;
+
+				return false;
 			}
 
 			string path = AssetDatabase.GetAssetPath(target);
+			reference = FileReference.FromPath(path);
+
+			return true;
+		}
+
+		private static bool Get(out FileReference reference, out LockInfo info)
+		{
+			if (!Get(out reference))
+			{
+				info = default;
+
+				return false;
+			}
+
+			return AssetLockManager.Instance.Repo.TryGetValue(reference, out info);
+		}
+
+		[MenuItem("Assets/AssetLock/Lock Asset", priority = Constants.CONTEXT_MENU_BASE_PRIORITY)]
+		private static void LockSelected()
+		{
+			if (!Get(out FileReference path))
+			{
+				return;
+			}
+
 			AssetLockManager.Instance.LockFile(path);
 		}
 
 		[MenuItem("Assets/AssetLock/Lock Asset", true)]
 		private static bool CanLockSelected()
 		{
-			Object target = Selection.activeObject;
-
-			if (!target)
+			if (!Get(out FileReference reference, out LockInfo info))
 			{
 				return false;
 			}
 
-			string path = AssetDatabase.GetAssetPath(target);
-			var reference = FileReference.FromPath(path);
-
-			if (AssetLockManager.Instance.Repo.TryGetValue(reference, out var lockInfo))
-			{
-				return lockInfo is { HasValue: true, locked: false };
-			}
-
-			return false;
+			return info is { HasValue: true, locked: false };
 		}
 
-		[MenuItem("Assets/AssetLock/Unlock Asset")]
+		[MenuItem("Assets/AssetLock/Unlock Asset", priority = Constants.CONTEXT_MENU_BASE_PRIORITY)]
 		private static void UnlockSelected()
 		{
-			Object target = Selection.activeObject;
-
-			if (!target)
+			if (!Get(out FileReference path))
 			{
 				return;
 			}
 
-			string path = AssetDatabase.GetAssetPath(target);
 			AssetLockManager.Instance.UnlockFile(path);
 		}
 
 		[MenuItem("Assets/AssetLock/Unlock Asset", true)]
 		private static bool CanUnlockSelected()
 		{
-			Object target = Selection.activeObject;
-
-			if (!target)
+			if (!Get(out FileReference reference, out LockInfo info))
 			{
 				return false;
 			}
 
-			string path = AssetDatabase.GetAssetPath(target);
-			var reference = FileReference.FromPath(path);
-
-			if (AssetLockManager.Instance.Repo.TryGetValue(reference, out var lockInfo))
-			{
-				return lockInfo is { HasValue: true, locked: true };
-			}
-
-			return false;
+			return info is { HasValue: true, LockedByMe: true };
 		}
 
-		[MenuItem("Assets/AssetLock/Is Binary Asset")]
+		[MenuItem("Assets/AssetLock/Debug/Is Binary Asset", priority = Constants.CONTEXT_MENU_BASE_PRIORITY + 
+            Constants.CONTEXT_MENU_SEPARATOR * 2)]
 		private static void IsBinaryAsset()
 		{
-			Object target = Selection.activeObject;
-			
-			if (!target)
+			if (!Get(out FileReference reference))
 			{
 				return;
 			}
-			
-			string path = AssetDatabase.GetAssetPath(target);
-			
-			AssetLockUtility.Logging.LogFormat("IsBinaryAsset: {0}", AssetLockUtility.ShouldTrack(path));
+
+			Logging.LogFormat(
+				"Is {0} Binary Asset: {1}",
+				reference.Name,
+				IsBinary(reference)
+			);
+		}
+
+		[MenuItem("Assets/AssetLock/Debug/Print Info", priority = Constants.CONTEXT_MENU_BASE_PRIORITY + 
+			Constants.CONTEXT_MENU_SEPARATOR * 2)]
+		private static void PrintInfo()
+		{
+			if (Get(out FileReference reference, out LockInfo info))
+			{
+				Logging.Log(info.ToString());
+			}
+			else if (reference.Exists)
+			{
+				Logging.Log(reference.ToString());
+			}
+			else
+			{
+				Logging.Log("No file selected.");
+			}
+		}
+
+		[MenuItem("Assets/AssetLock/Force Lock", priority = Constants.CONTEXT_MENU_BASE_PRIORITY + Constants.CONTEXT_MENU_SEPARATOR)]
+		private static void ForceLock()
+		{
+			if (!Get(out FileReference reference))
+			{
+				return;
+			}
+
+			AssetLockManager.Instance.LockFile(reference, true);
+		}
+		
+		[MenuItem("Assets/AssetLock/Force Lock", true)]
+		private static bool CanForceLock()
+		{
+			if (!Get(out FileReference reference, out LockInfo info))
+			{
+				return false;
+			}
+
+			return info is { HasValue: true, locked: false };
+		}
+
+		[MenuItem("Assets/AssetLock/Force Unlock", priority = Constants.CONTEXT_MENU_BASE_PRIORITY + Constants.CONTEXT_MENU_SEPARATOR)]
+		private static void ForceUnlock()
+		{
+			if (!Get(out FileReference reference))
+			{
+				return;
+			}
+
+			AssetLockManager.Instance.UnlockFile(reference, true);
+		}
+		
+		[MenuItem("Assets/AssetLock/Force Unlock", true)]
+		private static bool CanForceUnlock()
+		{
+			return Get(out FileReference reference, out LockInfo info);
 		}
 	}
 }

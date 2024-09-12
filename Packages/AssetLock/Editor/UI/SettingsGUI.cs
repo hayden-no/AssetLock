@@ -11,6 +11,9 @@ using static AssetLock.Editor.UI.ALGUI;
 
 namespace AssetLock.Editor.UI
 {
+	/// <summary>
+	/// Abstract class for settings providers.
+	/// </summary>
 	internal abstract class AbstractSettingsProvider : SettingsProvider
 	{
 		protected virtual string Title => Constants.SETTINGS_TITLE;
@@ -59,6 +62,9 @@ namespace AssetLock.Editor.UI
 		}
 	}
 
+	/// <summary>
+	/// Project settings provider.
+	/// </summary>
 	internal class ProjectSettingsProvider : AbstractSettingsProvider
 	{
 		readonly GUIContent m_configLabel = new("Configuration");
@@ -66,6 +72,11 @@ namespace AssetLock.Editor.UI
 		readonly GUIContent m_trackedExtensionsLabel = new(
 			"Tracked File Extensions",
 			"Only files with these extensions will be considered for tracking"
+		);
+		
+		readonly GUIContent m_trackNonBinaryFilesLabel = new(
+			"Track Non-Binary Files",
+			"Enable/disable tracking of non-binary files (only enable if you know what you're doing)"
 		);
 
 		readonly GUIContent m_quickCheckLabel = new("Quick Check Size", "The size of the quick check buffer");
@@ -89,10 +100,7 @@ namespace AssetLock.Editor.UI
 
 		protected override IEnumerable<string> GetSettingNames()
 		{
-			foreach (var content in GUIContents())
-			{
-				yield return content.text;
-			}
+			return GUIContents().SelectMany(content => content.text.Split(' '));
 		}
 
 		public ProjectSettingsProvider()
@@ -102,6 +110,7 @@ namespace AssetLock.Editor.UI
 		{
 			BeginSearchableGroup(m_configLabel, ctx);
 			SearchableNumericField(m_quickCheckLabel, QuickCheckSize, ctx);
+			SearchableToggle(m_trackNonBinaryFilesLabel, TrackNonBinaryFiles, ctx);
 			SearchableStringField(m_gitRemoteUrlLabel, GitRemoteUrl, ctx);
 			SearchableStringField(m_gitLfsServerLabel, GitLfsServerUrl, ctx);
 			SearchableStringField(m_gitLfsServerLocksLabel, GitLfsServerLocksApiUrl, ctx);
@@ -111,11 +120,19 @@ namespace AssetLock.Editor.UI
 		}
 	}
 
+	/// <summary>
+	/// User settings provider.
+	/// </summary>
 	internal class UserSettingsProvider : AbstractSettingsProvider
 	{
 		readonly GUIContent m_configLabel = new("Configuration");
 		readonly GUIContent m_masterEnableLabel = new("Master Enable", "Enable/disable AssetLock");
 		readonly GUIContent m_autoLockLabel = new("Auto Lock", "Enable/disable auto-locking of assets");
+		readonly GUIContent m_parseFilesOnStartupLabel = new("Parse Files On Startup", "Enable/disable parsing of files on startup");
+		readonly GUIContent m_useblockingCallsInProcessorLabel = new(
+			"Use Blocking Calls In Processor",
+			"When enabled, certain editor locking operations will block the main thread"
+		);
 		readonly GUIContent m_refreshRateLabel = new("Refresh Rate", "Rate in seconds to refresh lock status");
 		readonly GUIContent m_gitExeLabel = new("Git Executable", "Path to git executable");
 		readonly GUIContent m_gitDownloadLabel = new("Download Git", Constants.GIT_DOWNLOAD_URL);
@@ -132,6 +149,7 @@ namespace AssetLock.Editor.UI
 		);
 
 		readonly GUIContent m_useHttpLabel = new("Use HTTP", "Enable/disable HTTP for git operations");
+		readonly GUIContent m_logHttpLabel = new("Log HTTP", "Enable/disable HTTP logging");
 
 		readonly GUIContent m_verboseLoggingLabel = new("Verbose Logging", "Enable/disable verbose logging");
 		readonly GUIContent m_enableProfilingLabel = new("Enable Profiling", "Enable/disable various debug profiling");
@@ -150,6 +168,8 @@ namespace AssetLock.Editor.UI
 		{
 			yield return m_masterEnableLabel;
 			yield return m_autoLockLabel;
+			yield return m_parseFilesOnStartupLabel;
+			yield return m_useblockingCallsInProcessorLabel;
 			yield return m_refreshRateLabel;
 			yield return m_gitExeLabel;
 			yield return m_gitDownloadLabel;
@@ -159,6 +179,7 @@ namespace AssetLock.Editor.UI
 			yield return m_debugLabel;
 			yield return m_debugModeLabel;
 			yield return m_useHttpLabel;
+			yield return m_logHttpLabel;
 			yield return m_forceSyncLabel;
 			yield return m_verboseLoggingLabel;
 			yield return m_infoLoggingLabel;
@@ -172,10 +193,7 @@ namespace AssetLock.Editor.UI
 
 		protected override IEnumerable<string> GetSettingNames()
 		{
-			foreach (var content in GetLabels())
-			{
-				yield return content.text;
-			}
+			return GetLabels().SelectMany(content => content.text.Split(' '));
 		}
 
 		public UserSettingsProvider()
@@ -186,6 +204,8 @@ namespace AssetLock.Editor.UI
 			BeginSearchableGroup(m_configLabel, ctx);
 			SearchableToggle(m_masterEnableLabel, MasterEnable, ctx);
 			SearchableToggle(m_autoLockLabel, AutoLock, ctx);
+			SearchableToggle(m_parseFilesOnStartupLabel, ParseFilesOnStartup, ctx);
+			SearchableToggle(m_useblockingCallsInProcessorLabel, UseBlockingCallsInProcessor, ctx);
 			SearchableNumericField(m_refreshRateLabel, AssetLockSettings.RefreshRate, ctx);
 
 			if (UseHttp)
@@ -199,7 +219,7 @@ namespace AssetLock.Editor.UI
 				GitPath,
 				ctx,
 				Constants.GIT_EXE_DIRECTORY_PATH,
-				Constants.DEFAULT_GIT_EXE,
+				Constants.EXE_EXTENSION,
 				m_gitDownloadLabel,
 				Constants.GIT_DOWNLOAD_URL
 			);
@@ -208,7 +228,7 @@ namespace AssetLock.Editor.UI
 				GitLfsPath,
 				ctx,
 				Constants.GIT_EXE_DIRECTORY_PATH,
-				Constants.DEFAULT_GIT_LFS_EXE,
+				Constants.EXE_EXTENSION,
 				m_gitLfsDownloadLabel,
 				Constants.GIT_LFS_DOWNLOAD_URL
 			);
@@ -230,6 +250,7 @@ namespace AssetLock.Editor.UI
 			if (DebugMode)
 			{
 				SearchableToggle(m_useHttpLabel, UseHttp, ctx);
+				SearchableToggle(m_logHttpLabel, LogHttp, ctx);
 				SearchableToggle(m_forceSyncLabel, ForceSynchronousProcessHandling, ctx);
 				SearchableToggle(m_enableProfilingLabel, EnableProfiling, ctx);
 				SearchableNumericField(m_profilingMinTimeLabel, ProfilingMinTimeMs, ctx);
@@ -242,7 +263,7 @@ namespace AssetLock.Editor.UI
 					SearchableButton(m_rebootLabel, ctx, () => AssetLockManager.Reboot());
 					SearchableButton(m_printLocksLabel, ctx, () => AssetLockManager.Instance.PrintLockRepo());
 					SearchableButton(m_clearLocksLabel, ctx, () => AssetLockManager.Instance.ResetLockRepo());
-					SearchableButton(m_parseAllAssetsLabel, ctx, () => _ = AssetLockManager.Instance.ParseAllAsync());
+					SearchableButton(m_parseAllAssetsLabel, ctx, () => AssetLockManager.Instance.ParseAll());
 				}
 			}
 

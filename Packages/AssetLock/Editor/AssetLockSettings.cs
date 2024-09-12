@@ -7,7 +7,10 @@ using static AssetLock.Editor.AssetLockUtility;
 
 namespace AssetLock.Editor
 {
-	internal class AssetLockSettings
+	/// <summary>
+	/// Handles the settings for the AssetLock package.
+	/// </summary>
+	internal static class AssetLockSettings
 	{
 		private static Settings s_projectInstance;
 
@@ -46,6 +49,10 @@ namespace AssetLock.Editor
 		internal static ALUserSetting<bool> MasterEnable = new(nameof(MasterEnable), true);
 
 		internal static ALUserSetting<bool> AutoLock = new(nameof(AutoLock), true);
+		
+		internal static ALUserSetting<bool> ParseFilesOnStartup = new(nameof(ParseFilesOnStartup), true);
+		
+		internal static ALUserSetting<bool> UseBlockingCallsInProcessor = new(nameof(UseBlockingCallsInProcessor), false);
 
 		internal static ALUserSetting<double> RefreshRate = new(nameof(RefreshRate), 10f);
 
@@ -57,6 +64,8 @@ namespace AssetLock.Editor
 		);
 		
 		internal static ALUserSetting<bool> UseHttp = new(nameof(UseHttp), true);
+		
+		internal static ALUserSetting<bool> LogHttp = new(nameof(LogHttp), false);
 
 		internal static ALUserSetting<bool> EnableProfiling = new(nameof(EnableProfiling), false);
 
@@ -97,6 +106,8 @@ namespace AssetLock.Editor
 			nameof(QuickCheckSize),
 			Constants.DEFAULT_QUICK_CHECK_SIZE
 		);
+		
+		internal static ALProjectSetting<bool> TrackNonBinaryFiles = new(nameof(TrackNonBinaryFiles), false);
 		
 		internal static ALProjectSetting<string> GitRemoteUrl = new(nameof(GitRemoteUrl), string.Empty);
 		internal static ALProjectSetting<string> GitLfsServerUrl = new(nameof(GitLfsServerUrl), string.Empty);

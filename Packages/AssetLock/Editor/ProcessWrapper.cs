@@ -1,15 +1,20 @@
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace AssetLock.Editor
 {
+	/// <summary>
+	/// Helper class for running processes.
+	/// </summary>
 	public class ProcessWrapper
 	{
 		public const string POWERSHELL = "WindowsPowerShell\\v1.0\\powershell.exe";
@@ -58,6 +63,7 @@ namespace AssetLock.Editor
 		{
 			ProcessResult result;
 			using var profiler = new AssetLockUtility.Logging.Profiler();
+			args = ProcessArgs(args);
 
 			if (!ShouldRunAgain(args))
 			{
@@ -92,6 +98,7 @@ namespace AssetLock.Editor
 		{
 			using var profiler = new AssetLockUtility.Logging.Profiler();
 			ProcessResult result;
+			args = ProcessArgs(args);
 
 			if (!ShouldRunAgain(args))
 			{
@@ -119,6 +126,11 @@ namespace AssetLock.Editor
 			return result;
 		}
 
+		private static string[] ProcessArgs(string[] args)
+		{
+			return args.Where(s => !string.IsNullOrWhiteSpace(s)).ToArray();
+		}
+
 		private bool IsSameCommand(string[] args)
 		{
 			return LastCommand == string.Join(" ", args);
@@ -135,6 +147,9 @@ namespace AssetLock.Editor
 		}
 	}
 
+	/// <summary>
+	/// Holds the result of a process execution.
+	/// </summary>
 	public readonly struct ProcessResult
 	{
 		public readonly string[] ArgsIn;
@@ -164,6 +179,9 @@ namespace AssetLock.Editor
 		}
 	}
 
+	/// <summary>
+	/// A wrapper around a process instance.
+	/// </summary>
 	internal class ProcessInstance : IDisposable
 	{
 		private readonly Process m_process;
@@ -189,19 +207,24 @@ namespace AssetLock.Editor
 			SetArgs(startInfo, args);
 
 			m_process = new Process { StartInfo = startInfo };
+
+			m_process.EnableRaisingEvents = true;
+			m_process.ErrorDataReceived += OnErrorDataReceived;
+			m_process.OutputDataReceived += OnOutputDataReceived;
+		}
+
+		private void StartProcess()
+		{
+			m_process.Start();
+			m_process.BeginOutputReadLine();
+			m_process.BeginErrorReadLine();
 		}
 
 		internal static ProcessResult Run(string exePath, string workingPath, params string[] args)
 		{
 			using ProcessInstance instance = new ProcessInstance(exePath, workingPath, args);
 
-			instance.m_process.EnableRaisingEvents = true;
-			instance.m_process.ErrorDataReceived += instance.OnErrorDataReceived;
-			instance.m_process.OutputDataReceived += instance.OnOutputDataReceived;
-
-			instance.m_process.Start();
-			instance.m_process.BeginOutputReadLine();
-			instance.m_process.BeginErrorReadLine();
+			instance.StartProcess();
 			instance.m_process.WaitForExit(instance.Timeout);
 
 			int exitCode = -1;
@@ -233,13 +256,7 @@ namespace AssetLock.Editor
 
 			using ProcessInstance instance = new ProcessInstance(exePath, workingPath, args);
 
-			instance.m_process.EnableRaisingEvents = true;
-			instance.m_process.ErrorDataReceived += instance.OnErrorDataReceived;
-			instance.m_process.OutputDataReceived += instance.OnOutputDataReceived;
-
-			instance.m_process.Start();
-			instance.m_process.BeginOutputReadLine();
-			instance.m_process.BeginErrorReadLine();
+			instance.StartProcess();
 			await WaitForExitAsync(instance.m_process, ct);
 
 			int exitCode = -1;

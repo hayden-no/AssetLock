@@ -2,3 +2,5 @@ E:/Projects/Unity/AssetLock/Assets/BinaryObject.asset filter=lfs diff=lfs merge=
  filter=lfs diff=lfs merge=lfs -text lockable
 E:/Projects/Unity/AssetLock/Assets/~UnityDirMonSyncFile~a644fa08575467a4987bc54b2595d948~ filter=lfs diff=lfs merge=lfs -text lockable
 "Assets/BinaryObject.asset" filter=lfs diff=lfs merge=lfs -text lockable
+"Assets/Dev/Test0.asset" filter=lfs diff=lfs merge=lfs -text lockable
+"Assets/Dev/Test/Dir/Test1.asset" filter=lfs diff=lfs merge=lfs -text lockable

@@ -20,6 +20,8 @@ namespace AssetLock.Editor.Manager
 			get => Interlocked.Read(ref m_refreshing) > 0;
 			set => Interlocked.Exchange(ref m_refreshing, value ? 1 : 0);
 		}
+		
+		private ConcurrentBag<TaskCompletionSource<bool>> m_refreshTasks = new();
 
 		private void TriggerLoop(float delay = 0.25f)
 		{
@@ -29,6 +31,35 @@ namespace AssetLock.Editor.Manager
 			}
 
 			m_refreshTimer = delay;
+		}
+
+		private Task<bool> GetRefreshTask()
+		{
+			var tcm = new TaskCompletionSource<bool>();
+			m_refreshTasks.Add(tcm);
+			return tcm.Task;
+		}
+
+		private async Task<bool> GetCommandTask()
+		{
+			if (Refreshing)
+			{
+				await GetRefreshTask();
+			}
+			
+			var tcm = new TaskCompletionSource<bool>();
+			m_refreshTasks.Add(tcm);
+			return await tcm.Task;
+		}
+
+		private void EndRefresh()
+		{
+			foreach (var tcm in m_refreshTasks)
+			{
+				tcm.SetResult(true);
+			}
+			
+			m_refreshTasks.Clear();
 		}
 
 		private async void EditorLoop()
@@ -42,8 +73,9 @@ namespace AssetLock.Editor.Manager
 			{
 				return;
 			}
-
+			
 			await InnerLoopAsync();
+			EndRefresh();
 		}
 
 		private async Task InnerLoopAsync()

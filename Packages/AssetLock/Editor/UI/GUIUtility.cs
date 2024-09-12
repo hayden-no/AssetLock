@@ -9,6 +9,9 @@ using static UnityEngine.GUILayout;
 
 namespace AssetLock.Editor.UI
 {
+	/// <summary>
+	/// Small utility class for GUI elements.
+	/// </summary>
 	internal static class ALGUI
 	{
 		private static HashSet<string> s_keywords = null;

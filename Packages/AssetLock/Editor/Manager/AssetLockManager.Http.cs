@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using AssetLock.Editor.Data;
 using Newtonsoft.Json;
 using UnityEngine.Networking;
 using static AssetLock.Editor.AssetLockUtility;
@@ -20,7 +21,7 @@ namespace AssetLock.Editor.Manager
 
 		const string CONTENT_TYPE = "application/vnd.git-lfs+json";
 
-		private async Task<UnityWebRequest> SendWebRequest(UnityWebRequest request)
+		private async Task<UnityWebRequest> SendAsync(UnityWebRequest request)
 		{
 			var operation = request.SendWebRequest();
 
@@ -31,7 +32,7 @@ namespace AssetLock.Editor.Manager
 
 			return operation.webRequest;
 		}
-		
+
 		private void AppendHeaders(UnityWebRequest request)
 		{
 			request.SetRequestHeader("Accept", CONTENT_TYPE);
@@ -42,52 +43,61 @@ namespace AssetLock.Editor.Manager
 		{
 			var request = UnityWebRequest.Post(GitLfsServerLocksApiUrl, GetPostData(), CONTENT_TYPE);
 			AppendHeaders(request);
-			Logging.LogVerboseFormat("[HTTP] Sending lock request: {0}", GetWebRequestLogMessage(request));
+
+			if (LogHttp)
+			{
+				Logging.LogVerboseFormat("[HTTP] Sending lock request: {0}", GetWebRequestLogMessage(request));
+			}
+
 			request.downloadHandler = new DownloadHandlerBuffer();
-			var webResult = await SendWebRequest(request);
+			var webResult = await SendAsync(request);
 			var result = (false, default(LockInfo));
 
-			if (webResult.responseCode == HTTP_CREATED)
+			switch (webResult.responseCode)
 			{
-				LockSuccessResponse response =
-					JsonConvert.DeserializeObject<LockSuccessResponse>(webResult.downloadHandler.text);
-				result = (true, response.Lock);
+				case HTTP_CREATED:
+				{
+					LockSuccessResponse response =
+						JsonConvert.DeserializeObject<LockSuccessResponse>(webResult.downloadHandler.text);
+					result = (true, response.Lock);
 
-				goto finalize;
-			}
+					goto finalize;
+				}
+				case HTTP_CONFILCT:
+				{
+					LockExistsResponse response =
+						JsonConvert.DeserializeObject<LockExistsResponse>(webResult.downloadHandler.text);
+					Logging.LogErrorFormat("[HTTP] Failed to lock file {0}: {1}", file.UnityPath, response);
 
-			if (webResult.responseCode == HTTP_CONFILCT)
-			{
-				LockExistsResponse response =
-					JsonConvert.DeserializeObject<LockExistsResponse>(webResult.downloadHandler.text);
-				Logging.LogErrorFormat("[HTTP] Failed to lock file {0}: {1}", file.UnityPath, response);
+					goto finalize;
+				}
+				case HTTP_FORBIDDEN:
+				{
+					LockUnauthorizedResponse response =
+						JsonConvert.DeserializeObject<LockUnauthorizedResponse>(webResult.downloadHandler.text);
+					Logging.LogErrorFormat("[HTTP] Failed to lock file {0}: {1}", file.UnityPath, response);
 
-				goto finalize;
-			}
+					goto finalize;
+				}
+				case HTTP_ERROR:
+				{
+					LockErrorResponse response =
+						JsonConvert.DeserializeObject<LockErrorResponse>(webResult.downloadHandler.text);
+					Logging.LogErrorFormat("[HTTP] Failed to lock file {0}: {1}", file.UnityPath, response);
 
-			if (webResult.responseCode == HTTP_FORBIDDEN)
-			{
-				LockUnauthorizedResponse response =
-					JsonConvert.DeserializeObject<LockUnauthorizedResponse>(webResult.downloadHandler.text);
-				Logging.LogErrorFormat("[HTTP] Failed to lock file {0}: {1}", file.UnityPath, response);
-
-				goto finalize;
-			}
-
-			if (webResult.responseCode == HTTP_ERROR)
-			{
-				LockErrorResponse response =
-					JsonConvert.DeserializeObject<LockErrorResponse>(webResult.downloadHandler.text);
-				Logging.LogErrorFormat("[HTTP] Failed to lock file {0}: {1}", file.UnityPath, response);
-
-				goto finalize;
+					goto finalize;
+				}
 			}
 
 			// else
 			HandleUnknownError(webResult);
 
 		finalize:
-			Logging.LogVerboseFormat("[HTTP] Received response: {0}", GetWebRequestLogMessage(webResult));
+
+			if (LogHttp)
+			{
+				Logging.LogVerboseFormat("[HTTP] Received response: {0}", GetWebRequestLogMessage(webResult));
+			}
 			webResult.Dispose();
 
 			return result;
@@ -109,43 +119,52 @@ namespace AssetLock.Editor.Manager
 		{
 			var request = UnityWebRequest.Get(requestData.ToURI(GitLfsServerLocksApiUrl));
 			AppendHeaders(request);
-			Logging.LogVerboseFormat("[HTTP] Sending list request: {0}", GetWebRequestLogMessage(request));
+
+			if (LogHttp)
+			{
+				Logging.LogVerboseFormat("[HTTP] Sending list request: {0}", GetWebRequestLogMessage(request));
+			}
 			request.downloadHandler = new DownloadHandlerBuffer();
-			var webResult = await SendWebRequest(request);
+			var webResult = await SendAsync(request);
 			var result = (false, default(string), default(IEnumerable<LockInfo>));
 
-			if (webResult.responseCode == HTTP_OK)
+			switch (webResult.responseCode)
 			{
-				ListLocksSuccessResponse response =
-					JsonConvert.DeserializeObject<ListLocksSuccessResponse>(webResult.downloadHandler.text);
-				result = (true, response.NextCursor, response.Locks.Select(l => (LockInfo)l));
+				case HTTP_OK:
+				{
+					ListLocksSuccessResponse response =
+						JsonConvert.DeserializeObject<ListLocksSuccessResponse>(webResult.downloadHandler.text);
+					result = (true, response.NextCursor, response.Locks.Select(l => (LockInfo)l));
 
-				goto finalize;
-			}
+					goto finalize;
+				}
+				case HTTP_FORBIDDEN:
+				{
+					LockUnauthorizedResponse response =
+						JsonConvert.DeserializeObject<LockUnauthorizedResponse>(webResult.downloadHandler.text);
+					Logging.LogErrorFormat("[HTTP] Failed to list locks: {0}", response);
 
-			if (webResult.responseCode == HTTP_FORBIDDEN)
-			{
-				LockUnauthorizedResponse response =
-					JsonConvert.DeserializeObject<LockUnauthorizedResponse>(webResult.downloadHandler.text);
-				Logging.LogErrorFormat("[HTTP] Failed to list locks: {0}", response);
+					goto finalize;
+				}
+				case HTTP_ERROR:
+				{
+					LockErrorResponse response =
+						JsonConvert.DeserializeObject<LockErrorResponse>(webResult.downloadHandler.text);
+					Logging.LogErrorFormat("[HTTP] Failed to list locks: {0}", response);
 
-				goto finalize;
-			}
-
-			if (webResult.responseCode == HTTP_ERROR)
-			{
-				LockErrorResponse response =
-					JsonConvert.DeserializeObject<LockErrorResponse>(webResult.downloadHandler.text);
-				Logging.LogErrorFormat("[HTTP] Failed to list locks: {0}", response);
-
-				goto finalize;
+					goto finalize;
+				}
 			}
 
 			// else
 			HandleUnknownError(webResult);
 
 		finalize:
-			Logging.LogVerboseFormat("[HTTP] Received response: {0}", GetWebRequestLogMessage(webResult));
+
+			if (LogHttp)
+			{
+				Logging.LogVerboseFormat("[HTTP] Received response: {0}", GetWebRequestLogMessage(webResult));
+			}
 			webResult.Dispose();
 
 			return result;
@@ -155,42 +174,51 @@ namespace AssetLock.Editor.Manager
 		{
 			var request = UnityWebRequest.Post(GetDeleteUrl(), GetPostData(), CONTENT_TYPE);
 			AppendHeaders(request);
-			Logging.LogVerboseFormat("[HTTP] Sending unlock request: {0}", GetWebRequestLogMessage(request));
+
+			if (LogHttp)
+			{
+				Logging.LogVerboseFormat("[HTTP] Sending unlock request: {0}", GetWebRequestLogMessage(request));
+			}
 			request.downloadHandler = new DownloadHandlerBuffer();
-			var webResult = await SendWebRequest(request);
+			var webResult = await SendAsync(request);
 			var result = (false, default(LockInfo));
 
-			if (webResult.responseCode == HTTP_OK)
+			switch (webResult.responseCode)
 			{
-				var response = JsonConvert.DeserializeObject<LockSuccessResponse>(webResult.downloadHandler.text);
-				result = (true, response.Lock);
-				
-				goto finalize;
-			}
-			
-			if (webResult.responseCode == HTTP_FORBIDDEN)
-			{
-				LockUnauthorizedResponse response =
-					JsonConvert.DeserializeObject<LockUnauthorizedResponse>(webResult.downloadHandler.text);
-				Logging.LogErrorFormat("[HTTP] Failed to unlock file {0}: {1}", info.path, response);
+				case HTTP_OK:
+				{
+					var response = JsonConvert.DeserializeObject<LockSuccessResponse>(webResult.downloadHandler.text);
+					result = (true, response.Lock);
 
-				goto finalize;
-			}
-			
-			if (webResult.responseCode == HTTP_ERROR)
-			{
-				LockErrorResponse response =
-					JsonConvert.DeserializeObject<LockErrorResponse>(webResult.downloadHandler.text);
-				Logging.LogErrorFormat("[HTTP] Failed to unlock file {0}: {1}", info.path, response);
+					goto finalize;
+				}
+				case HTTP_FORBIDDEN:
+				{
+					LockUnauthorizedResponse response =
+						JsonConvert.DeserializeObject<LockUnauthorizedResponse>(webResult.downloadHandler.text);
+					Logging.LogErrorFormat("[HTTP] Failed to unlock file {0}: {1}", info.path, response);
 
-				goto finalize;
+					goto finalize;
+				}
+				case HTTP_ERROR:
+				{
+					LockErrorResponse response =
+						JsonConvert.DeserializeObject<LockErrorResponse>(webResult.downloadHandler.text);
+					Logging.LogErrorFormat("[HTTP] Failed to unlock file {0}: {1}", info.path, response);
+
+					goto finalize;
+				}
 			}
-			
+
 			// else
 			HandleUnknownError(webResult);
 
 		finalize:
-			Logging.LogVerboseFormat("[HTTP] Received response: {0}", GetWebRequestLogMessage(webResult));
+
+			if (LogHttp)
+			{
+				Logging.LogVerboseFormat("[HTTP] Received response: {0}", GetWebRequestLogMessage(webResult));
+			}
 			webResult.Dispose();
 
 			return result;
@@ -226,234 +254,32 @@ namespace AssetLock.Editor.Manager
 			sb.AppendLine("Request Headers:");
 			sb.AppendLine($"\tAccept: {request.GetRequestHeader("Accept")}");
 			sb.AppendLine($"\tAuthorization: {request.GetRequestHeader("Authorization")}");
-            			
+
 			sb.AppendLine("Response Headers:");
+
 			foreach ((var key, var value) in request.GetResponseHeaders() ?? new Dictionary<string, string>())
 			{
 				sb.AppendLine($"\t{key}: {value}");
 			}
-			
+
 			sb.AppendLine("Response:");
-			
+
 			if (request.responseCode != 0)
 			{
 				sb.AppendLine($"\tCode: {request.responseCode}");
 			}
-			
+
 			if (!string.IsNullOrWhiteSpace(request.error))
 			{
 				sb.AppendLine($"\tError: {request.error}");
 			}
-			
+
 			if (!string.IsNullOrWhiteSpace(request.downloadHandler.text))
 			{
 				sb.AppendLine($"\tData: {request.downloadHandler.text}");
 			}
-			
+
 			return sb.ToString();
-		}
-
-		[JsonObject]
-		private struct LockRequest
-		{
-			[JsonProperty("path")] public string Path;
-			[JsonProperty("ref")] public GitLfsRefObject Ref;
-
-			public override string ToString()
-			{
-				return Path;
-			}
-		}
-
-		[JsonObject]
-		private struct GitLfsRefObject
-		{
-			[JsonProperty("name")] public string Name;
-
-			public override string ToString()
-			{
-				return Name;
-			}
-		}
-
-		[JsonObject]
-		private struct LockSuccessResponse
-		{
-			[JsonProperty("lock")] public LocksResponseDataJson Lock;
-
-			public override string ToString()
-			{
-				return Lock.ToString();
-			}
-		}
-
-		[JsonObject]
-		private struct LockExistsResponse
-		{
-			[JsonProperty("lock")] public LocksResponseDataJson Lock;
-
-			[JsonProperty("message")] public string Message;
-			[JsonProperty("documentation_url")] public string DocumentationUrl;
-			[JsonProperty("request_id")] public string RequestId;
-
-			public override string ToString()
-			{
-				return $"{RequestId}: {Message} ({DocumentationUrl})";
-			}
-		}
-
-		[JsonObject]
-		private struct LockUnauthorizedResponse
-		{
-			[JsonProperty("message")] public string Message;
-			[JsonProperty("documentation_url")] public string DocumentationUrl;
-			[JsonProperty("request_id")] public string RequestId;
-			
-			public override string ToString()
-			{
-				return $"{RequestId}: {Message} ({DocumentationUrl})";
-			}
-		}
-
-		[JsonObject]
-		private struct LockErrorResponse
-		{
-			[JsonProperty("message")] public string Message;
-			[JsonProperty("documentation_url")] public string DocumentationUrl;
-			[JsonProperty("request_id")] public string RequestId;
-			
-			public override string ToString()
-			{
-				return $"{RequestId}: {Message} ({DocumentationUrl})";
-			}
-		}
-
-		[JsonObject]
-		private struct ListLocksRequest
-		{
-			[JsonProperty("path")] public string Path;
-
-			[JsonProperty("id")] public string Id;
-
-			[JsonProperty("cursor")] public string Cursor;
-
-			[JsonProperty("limit")] public int Limit;
-
-			[JsonProperty("ref")] public GitLfsRefObject Ref;
-
-			public override string ToString()
-			{
-				return $"{Id}: {Path}";
-			}
-
-			public string ToURI(string baseUrl)
-			{
-				const string pathKey = "path";
-				const string idKey = "id";
-				const string cursorKey = "cursor";
-				const string limitKey = "limit";
-				const string refKey = "refspec";
-
-				StringBuilder sb = new();
-				sb.Append(baseUrl);
-				bool any = false;
-
-				if (!string.IsNullOrWhiteSpace(Path))
-				{
-					sb.Append("?");
-					any = true;
-
-					sb.Append($"{pathKey}={Path}");
-				}
-
-				if (!string.IsNullOrWhiteSpace(Id))
-				{
-					if (!any)
-					{
-						sb.Append("?");
-						any = true;
-					}
-					else
-					{
-						sb.Append("&");
-					}
-
-					sb.Append($"{idKey}={Id}");
-				}
-
-				if (!string.IsNullOrWhiteSpace(Cursor))
-				{
-					if (!any)
-					{
-						sb.Append("?");
-						any = true;
-					}
-					else
-					{
-						sb.Append("&");
-					}
-
-					sb.Append($"{cursorKey}={Cursor}");
-				}
-
-				if (Limit > 0)
-				{
-					if (!any)
-					{
-						sb.Append("?");
-						any = true;
-					}
-					else
-					{
-						sb.Append("&");
-					}
-
-					sb.Append($"{limitKey}={Limit}");
-				}
-
-				if (!string.IsNullOrWhiteSpace(Ref.Name))
-				{
-					if (!any)
-					{
-						sb.Append("?");
-						any = true;
-					}
-					else
-					{
-						sb.Append("&");
-					}
-
-					sb.Append($"{refKey}={Ref.Name}");
-				}
-
-				return sb.ToString();
-			}
-		}
-
-		[JsonObject]
-		private struct ListLocksSuccessResponse
-		{
-			[JsonProperty("locks")] public LocksResponseDataJson[] Locks;
-
-			[JsonProperty("next_cursor")] public string NextCursor;
-
-			public override string ToString()
-			{
-				return $"{Locks.Length} locks";
-			}
-		}
-
-		[JsonObject]
-		// send to /locks/:id/unlock
-		private struct DeleteLockRequest
-		{
-			[JsonProperty("force")] public bool Force;
-			[JsonProperty("ref")] public GitLfsRefObject Ref;
-
-			public override string ToString()
-			{
-				return $"Force: {Force}";
-			}
 		}
 	}
 }

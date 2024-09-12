@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using AssetLock.Editor.Data;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
 using UnityEngine;
@@ -11,6 +12,9 @@ using static AssetLock.Editor.AssetLockSettings;
 
 namespace AssetLock.Editor
 {
+	/// <summary>
+	/// Utility class for the AssetLock package.
+	/// </summary>
 	internal static class AssetLockUtility
 	{
 		public static class Constants
@@ -21,6 +25,7 @@ namespace AssetLock.Editor
 
 			public const string DEFAULT_GIT_EXE = "git.exe";
 			public const string DEFAULT_GIT_LFS_EXE = "git-lfs.exe";
+			public const string EXE_EXTENSION = ".exe";
 
 			public const string GIT_EXE_DIRECTORY_PATH = "C\\Program Files";
 
@@ -28,7 +33,7 @@ namespace AssetLock.Editor
 			public const string GIT_LFS_DOWNLOAD_URL = "https://git-lfs.github.com/";
 
 			public static readonly string[] DEFAULT_TRACKED_EXTENSIONS = new[] { ".prefab", ".unity", ".asset" };
-			public const int DEFAULT_QUICK_CHECK_SIZE = 1024;
+			public const int DEFAULT_QUICK_CHECK_SIZE = 4096;
 
 			public const string PACKAGE_NAME = "com.haydenno.assetlock";
 
@@ -45,8 +50,13 @@ namespace AssetLock.Editor
 				Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.Machine) +
 				";" +
 				Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User);
+			
+			public const string FILE_SYSTEM_UP_DIR = "..";
 
 			public const int DEFAULT_LOCK_TIMEOUT = 2500;
+
+			public const int CONTEXT_MENU_BASE_PRIORITY = 9000;
+			public const int CONTEXT_MENU_SEPARATOR = 100;
 		}
 
 		public static class Logging
@@ -58,6 +68,7 @@ namespace AssetLock.Editor
 				return LOG_PREFIX + message;
 			}
 
+			// ReSharper disable Unity.PerformanceAnalysis
 			[HideInCallstack]
 			public static void LogVerbose(string message)
 			{
@@ -67,16 +78,18 @@ namespace AssetLock.Editor
 				}
 			}
 
+			// ReSharper disable Unity.PerformanceAnalysis
 			[StringFormatMethod("format")]
 			[HideInCallstack]
 			public static void LogVerboseFormat(string format, params object[] args)
 			{
 				if (DebugMode && VerboseLogging)
 				{
-					UnityEngine.Debug.LogFormat(GetMessage(format), args);
+					UnityEngine.Debug.LogFormat(GetMessage(format),args);
 				}
 			}
 
+			// ReSharper disable Unity.PerformanceAnalysis
 			[HideInCallstack]
 			public static void Log(string message)
 			{
@@ -86,6 +99,7 @@ namespace AssetLock.Editor
 				}
 			}
 
+			// ReSharper disable Unity.PerformanceAnalysis
 			[StringFormatMethod("format")]
 			[HideInCallstack]
 			public static void LogFormat(string format, params object[] args)
@@ -96,6 +110,7 @@ namespace AssetLock.Editor
 				}
 			}
 
+			// ReSharper disable Unity.PerformanceAnalysis
 			[HideInCallstack]
 			public static void LogWarning(string message)
 			{
@@ -105,6 +120,7 @@ namespace AssetLock.Editor
 				}
 			}
 
+			// ReSharper disable Unity.PerformanceAnalysis
 			[StringFormatMethod("format")]
 			[HideInCallstack]
 			public static void LogWarningFormat(string format, params object[] args)
@@ -115,6 +131,7 @@ namespace AssetLock.Editor
 				}
 			}
 
+			// ReSharper disable Unity.PerformanceAnalysis
 			[HideInCallstack]
 			public static void LogError(string message)
 			{
@@ -124,6 +141,7 @@ namespace AssetLock.Editor
 				}
 			}
 
+			// ReSharper disable Unity.PerformanceAnalysis
 			[StringFormatMethod("format")]
 			[HideInCallstack]
 			public static void LogErrorFormat(string format, params object[] args)
@@ -233,12 +251,12 @@ namespace AssetLock.Editor
 				return false;
 			}
 
-			if (IsUnityYaml(info))
+			if (TrackNonBinaryFiles)
 			{
-				return false;
+				return true;
 			}
 
-			return IsBinary(info, QuickCheckSize);
+			return !IsUnityYaml(info) && IsBinary(info, QuickCheckSize);
 		}
 
 		// https://stackoverflow.com/questions/910873/how-can-i-determine-if-a-file-is-binary-or-text-in-c

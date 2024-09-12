@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using AssetLock.Editor.Data;
 using AssetLock.Editor.Manager;
 using UnityEditor;
 using static AssetLock.Editor.AssetLockSettings;
@@ -9,6 +10,9 @@ using FileMode = UnityEditor.VersionControl.FileMode;
 
 namespace AssetLock.Editor
 {
+	/// <summary>
+	/// How the Unity Editor interacts with AssetLock.
+	/// </summary>
 	public class AssetLockProcessor : AssetModificationProcessor
 	{
 		private static bool CanOpenForEdit(
@@ -29,9 +33,10 @@ namespace AssetLock.Editor
 
 			foreach (var path in GetAllBinaryPaths(assetOrMetaFilePaths))
 			{
-				if (!AssetLockManager.Instance.Repo.TryGetValue(path, out var info))
+				if (!GetLock(path, false, out var info))
 				{
-					AssetLockManager.Instance.TrackFile(path);
+					result = false;
+					outNotEditablePaths.Add(path.UnityPath);
 				}
 				else if (info is { locked: true, LockedByMe: false })
 				{
@@ -69,9 +74,10 @@ namespace AssetLock.Editor
 
 			foreach (var path in GetAllBinaryPaths(assetOrMetaFilePaths))
 			{
-				if (!AssetLockManager.Instance.Repo.TryGetValue(path, out var info))
+				if (!GetLock(path, false, out var info))
 				{
-					AssetLockManager.Instance.TrackFile(path);
+					result = false;
+					outNotEditablePaths.Add(path.UnityPath);
 				}
 				else if (!info.LockedByMe)
 				{
@@ -97,16 +103,17 @@ namespace AssetLock.Editor
 
 			foreach (var path in GetAllBinaryPaths(paths))
 			{
-				if (!AssetLockManager.Instance.Repo.TryGetValue(path, out var info))
+				if (!GetLock(path, UseBlockingCallsInProcessor, out var info))
 				{
-					AssetLockManager.Instance.TrackFile(path);
+					result = false;
+					outNotEditablePaths.Add(path.UnityPath);
 				}
 				else if (info is { locked: true, LockedByMe: false })
 				{
 					result = false;
 					outNotEditablePaths.Add(path.UnityPath);
 				}
-				else if (!TryAutoLock(info, "edit"))
+				else if (!TryAutoLock(info, false, "edit"))
 				{
 					result = false;
 					outNotEditablePaths.Add(path.UnityPath);
@@ -130,15 +137,15 @@ namespace AssetLock.Editor
 
 			foreach (var path in GetAllBinaryPaths(paths))
 			{
-				if (!AssetLockManager.Instance.Repo.TryGetValue(path, out var info))
+				if (!GetLock(path, true, out var info))
 				{
-					AssetLockManager.Instance.TrackFile(path);
+					unsaved.Add(path.UnityPath);
 				}
 				else if (info is { locked: true, LockedByMe: false })
 				{
 					unsaved.Add(path.UnityPath);
 				}
-				else if (!TryAutoLock(info, "save"))
+				else if (!TryAutoLock(info, true, "save"))
 				{
 					unsaved.Add(path.UnityPath);
 				}
@@ -166,10 +173,8 @@ namespace AssetLock.Editor
 				return AssetDeleteResult.DidNotDelete;
 			}
 
-			if (!AssetLockManager.Instance.Repo.TryGetValue(path, out var info))
+			if (!GetLock(path, true, out var info))
 			{
-				AssetLockManager.Instance.TrackFile(path);
-
 				return AssetDeleteResult.FailedDelete;
 			}
 			else if (info is { locked: true, LockedByMe: false })
@@ -182,7 +187,7 @@ namespace AssetLock.Editor
 
 				return AssetDeleteResult.FailedDelete;
 			}
-			else if (TryAutoLock(info, "delete"))
+			else if (TryAutoLock(info, true, "delete"))
 			{
 				return AssetDeleteResult.FailedDelete;
 			}
@@ -201,16 +206,14 @@ namespace AssetLock.Editor
 
 			HandleRefresh(StatusQueryOptions.UseCachedIfPossible);
 			var path = FileReference.FromPath(sourcePath);
-			
-			if (!ShouldTrack(path))
+
+			if (!path.ShouldTrack)
 			{
 				return AssetMoveResult.DidNotMove;
 			}
 
-			if (!AssetLockManager.Instance.Repo.TryGetValue(path, out var info))
+			if (!GetLock(path, true, out var info))
 			{
-				AssetLockManager.Instance.TrackFile(path);
-
 				return AssetMoveResult.FailedMove;
 			}
 			else if (info is { locked: true, LockedByMe: false })
@@ -223,12 +226,13 @@ namespace AssetLock.Editor
 
 				return AssetMoveResult.FailedMove;
 			}
-			else if (!TryAutoLock(info, "move"))
+			else if (!TryAutoLock(info, true, "move"))
 			{
 				return AssetMoveResult.FailedMove;
 			}
-			
+
 			AssetLockManager.Instance.RegisterMove(path, destinationPath);
+
 			return AssetMoveResult.DidNotMove;
 		}
 
@@ -245,11 +249,11 @@ namespace AssetLock.Editor
 			{
 				if ((mode & FileMode.Text) != 0)
 				{
-					AssetLockManager.Instance.UntrackFile(path);
+					path.UnlockFile();
 				}
 				else if ((mode & FileMode.Binary) != 0)
 				{
-					AssetLockManager.Instance.TrackFile(path);
+					path.TrackFile();
 				}
 
 				Logging.LogVerboseFormat("File mode changed for {0} to {1}", path, mode);
@@ -258,17 +262,35 @@ namespace AssetLock.Editor
 
 		private static void OnStatusUpdated()
 		{
-			using var profiler = new Logging.Profiler();
-
 			if (!MasterEnable)
 			{
 				return;
 			}
 
-			_ = AssetLockManager.Instance.RefreshAsync();
+			AssetLockManager.Instance.Refresh();
 		}
 
-		private static bool TryAutoLock(FileReference reference, string action = "modify")
+		private static bool GetLock(FileReference reference, bool blocking, out LockInfo info)
+		{
+			if (reference.TryGetLock(out info))
+			{
+				return true;
+			}
+
+			if (blocking)
+			{
+				reference.TrackFileAsync().Wait(Constants.DEFAULT_LOCK_TIMEOUT);
+				return GetLock(reference, false, out info);
+			}
+			else
+			{
+				reference.TrackFile();
+			}
+
+			return false;
+		}
+
+		private static bool TryAutoLock(FileReference reference, bool blocking = true, string action = "modify")
 		{
 			if (!MasterEnable)
 			{
@@ -277,7 +299,15 @@ namespace AssetLock.Editor
 
 			if (AutoLock)
 			{
-				AssetLockManager.Instance.LockFile(reference);
+				if (!blocking)
+				{
+					reference.LockFile();
+				}
+				else
+				{
+					reference.LockFileAsync().Wait(Constants.DEFAULT_LOCK_TIMEOUT);
+				}
+
 				Logging.LogFormat("Automatically locked asset {0} because it is binary.", reference.UnityPath);
 
 				return true;
@@ -305,11 +335,11 @@ namespace AssetLock.Editor
 
 					break;
 				case StatusQueryOptions.UseCachedIfPossible:
-					//AssetLockManager.Instance.Refresh();
+					AssetLockManager.Instance.Refresh();
 
 					break;
 				case StatusQueryOptions.UseCachedAsync:
-					//_ = AssetLockManager.Instance.RefreshAsync();
+					AssetLockManager.Instance.Refresh();
 
 					break;
 				default:

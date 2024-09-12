@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using AssetLock.Editor.Data;
 using AssetLock.Editor.UI;
 using UnityEditor;
 using UnityEditor.SettingsManagement;
@@ -13,6 +14,11 @@ using static AssetLock.Editor.AssetLockSettings;
 
 namespace AssetLock.Editor.Manager
 {
+	/// <summary>
+	/// The AssetLockManager is the main class for the AssetLock package.
+	/// Here you can track files, lock and unlock files, and manage the lock repository.
+	/// It handles all the communication with Git and Git-LFS.
+	/// </summary>
 	[InitializeOnLoad]
 	public partial class AssetLockManager : IDisposable
 	{
@@ -27,14 +33,36 @@ namespace AssetLock.Editor.Manager
 		private bool m_lfsInitialized;
 		private bool m_lfsFailed;
 
-		private string m_projectPath;
+		private DirectoryReference m_projectDir;
+		internal DirectoryReference ProjectDir => m_projectDir;
 
 		private bool m_disposed;
 		
+		/// <summary>
+		/// The total number of files being tracked by Asset Lock.
+		/// </summary>
 		public int TrackedCount => m_lockRepo.Count;
+		/// <summary>
+		/// Total number of files currently locked in the repository.
+		/// </summary>
 		public int LockedCount => m_lockRepo.Locks.Count(l => l.locked);
+		/// <summary>
+		/// Total number of files currently locked by the current user.
+		/// </summary>
+		/// <remarks>
+		/// The current user as determined by the Git configuration.
+		/// </remarks>
 		public int LockedByMeCount => m_lockRepo.Locks.Count(l => l is { locked: true, LockedByMe: true });
+		/// <summary>
+		/// Total number of files currently locked by other users.
+		/// </summary>
+		/// /// <remarks>
+		/// The current user as determined by the Git configuration.
+		/// </remarks>
 		public int LockedByOthersCount => m_lockRepo.Locks.Count(l => l is { locked: true, LockedByMe: false });
+		/// <summary>
+		/// Total number of files that are not locked, but are being tracked.
+		/// </summary>
 		public int UnlockedCount => m_lockRepo.Locks.Count(l => !l.locked);
 
 		private static UserSetting<string> s_repoSerialized = new(
@@ -44,14 +72,23 @@ namespace AssetLock.Editor.Manager
 			SettingsScope.User
 		);
 
+		/// <summary>
+		/// The singleton instance of the AssetLockManager.
+		/// </summary>
 		public static AssetLockManager Instance { get; private set; }
 
+		/// <summary>
+		/// Reboots the AssetLockManager.
+		/// </summary>
 		public static void Reboot()
 		{
 			Instance.Dispose();
 			Instance = new AssetLockManager();
 		}
 
+		/// <summary>
+		/// Unity entry point for the AssetLockManager.
+		/// </summary>
 		static AssetLockManager()
 		{
 			Instance ??= new AssetLockManager();
@@ -66,7 +103,7 @@ namespace AssetLock.Editor.Manager
 			
 			m_lockRepo = LockRepo.Deserialize(s_repoSerialized.value);
 
-			m_projectPath = Path.GetFullPath(Application.dataPath);
+			m_projectDir = DirectoryReference.FromPath(Path.GetFullPath(Application.dataPath));
 
 			m_gitProcess = new ProcessWrapper(GitPath);
 			m_lfsProcess = new ProcessWrapper(GitLfsPath);
@@ -87,6 +124,7 @@ namespace AssetLock.Editor.Manager
 			}
 		}
 
+		///<inheritdoc/>
 		public void Dispose()
 		{
 			s_repoSerialized.SetValue(m_lockRepo.Serialize(), true);
@@ -102,7 +140,14 @@ namespace AssetLock.Editor.Manager
 		{
 			if (result.HasErrText)
 			{
-				Logging.LogErrorFormat("{0} {1}", msg, result.StdErr);
+				if (string.IsNullOrWhiteSpace(msg))
+				{
+					Logging.LogError(result.StdErr);
+				}
+				else
+				{
+					Logging.LogErrorFormat("{0}\n{1}", msg, result.StdErr);
+				}
 
 				throw new Exception(result.StdErr);
 			}
@@ -138,37 +183,17 @@ namespace AssetLock.Editor.Manager
 			}
 		}
 
-		private async Task ParseDirectoryAsync(DirectoryInfo dir, List<DirectoryInfo> dirs)
+		private void ParseDirectory(DirectoryReference dir, List<DirectoryReference> dirs)
 		{
 			dirs.Add(dir);
-			foreach (FileInfo file in dir.GetFiles())
+			foreach (var file in dir.Files)
 			{
-				if (file.Extension.EndsWith("meta"))
-				{
-					continue;
-				}
-				
-				if (!IsTrackedExtension(file))
-				{
-					continue;
-				}
-
-				if (IsUnityYaml(file))
-				{
-					continue;
-				}
-
-				if (!IsBinary(file, QuickCheckSize))
-				{
-					continue;
-				}
-
-				await InternalTrackFileAsync(file);
+				file.TrackFile();
 			}
 
-			foreach (DirectoryInfo subdir in dir.GetDirectories())
+			foreach (var directory in dir.Directories)
 			{
-				await ParseDirectoryAsync(subdir, dirs);
+				ParseDirectory(directory, dirs);
 			}
 		}
 	}
