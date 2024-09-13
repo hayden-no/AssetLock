@@ -20,46 +20,34 @@ namespace AssetLock.Editor.UI
 		protected abstract IEnumerable<string> GetSettingNames();
 
 		protected AbstractSettingsProvider(string path, SettingsScope scope, string[] keywords = null)
-			: base(path, scope, keywords)
+			: base(path, scope, keywords) { }
+
+		public override void OnTitleBarGUI()
 		{
-			guiHandler = ContentGUI;
-			titleBarGuiHandler = TitleGUI;
-			footerBarGuiHandler = FooterGUI;
-			hasSearchInterestHandler = HasSearchContext;
+			// do nothing
 		}
 
-		protected virtual void TitleGUI() { }
-
-		protected abstract void ContentGUI(string ctx);
-
-		protected virtual void FooterGUI()
+		public override void OnGUI(string searchContext)
 		{
-			using (new EditorGUILayout.HorizontalScope())
-			{
-				FlexibleSpace();
-				Label("AssetLock v" + Constants.VERSION, EditorStyles.miniLabel);
-			}
+			ContentGUI(searchContext);
 		}
 
-		protected virtual bool HasSearchContext(string ctx)
+		public override bool HasSearchInterest(string searchContext)
 		{
-			if (string.IsNullOrEmpty(ctx))
+			if (string.IsNullOrEmpty(searchContext))
 			{
 				return false;
 			}
 
-			if (Title.Contains(ctx))
+			if (Title.Contains(searchContext))
 			{
 				return true;
 			}
 
-			if (GetSettingNames().Any(name => name.Contains(ctx)))
-			{
-				return true;
-			}
-
-			return false;
+			return GetSettingNames().Any(name => name.Contains(searchContext));
 		}
+
+		protected abstract void ContentGUI(string ctx);
 	}
 
 	/// <summary>
@@ -164,7 +152,7 @@ namespace AssetLock.Editor.UI
 		readonly GUIContent m_warningLoggingLabel = new("Warning Logging", "Enable/disable warning logging");
 		readonly GUIContent m_errorLoggingLabel = new("Error Logging", "Enable/disable error logging");
 
-		IEnumerable<GUIContent> GetLabels()
+		IEnumerable<GUIContent> GUIContents()
 		{
 			yield return m_masterEnableLabel;
 			yield return m_autoLockLabel;
@@ -193,7 +181,7 @@ namespace AssetLock.Editor.UI
 
 		protected override IEnumerable<string> GetSettingNames()
 		{
-			return GetLabels().SelectMany(content => content.text.Split(' '));
+			return GUIContents().SelectMany(content => content.text.Split(' '));
 		}
 
 		public UserSettingsProvider()

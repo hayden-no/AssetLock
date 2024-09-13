@@ -175,7 +175,7 @@ namespace AssetLock.Editor.UI
 			using (new HorizontalScope())
 			{
 				EditorGUI.BeginChangeCheck();
-				m_searchInput = DelayedTextField("Search: ", m_searchInput);
+				m_searchInput = DelayedTextField("Search:", m_searchInput);
 
 				if (EditorGUI.EndChangeCheck() || !m_expanded.Any())
 				{
@@ -365,7 +365,7 @@ namespace AssetLock.Editor.UI
 				}
 
 				// if the directory matches the search, display all files
-				DisplayLock(file.Lock, dirMatch ? string.Empty : ctx, m_dirBusy[dir]);
+				DisplayLock(file, dirMatch ? string.Empty : ctx, m_dirBusy[dir]);
 			}
 
 			EditorGUI.indentLevel -= 2;
@@ -417,6 +417,7 @@ namespace AssetLock.Editor.UI
 
 				GUILayout.FlexibleSpace();
 				DrawLockStatus();
+				GUILayout.Space(20);
 
 				if (!m_busy.TryGetValue(file, out var busy))
 				{
@@ -472,21 +473,26 @@ namespace AssetLock.Editor.UI
 					m_busy[file] = false;
 				}
 
-				if (busy)
+				using (new HorizontalScope())
 				{
-					GUILayout.Label("Busy", new GUIStyle(label) { normal = { textColor = Color.yellow } });
+					if (busy)
+					{
+						GUILayout.Label("Busy", new GUIStyle(label) { normal = { textColor = Color.yellow } });
+					}
+					else if (info.locked)
+					{
+						GUILayout.Label(lockedLabel, new GUIStyle(label) { normal = { textColor = Color.red } });
+						GUILayout.Label("by");
+						GUILayout.Label(
+							info.LockedByMe ? meLabel : ownerLabel,
+							new GUIStyle(label) { normal = { textColor = info.LockedByMe ? Color.cyan : Color.yellow } }
+						);
+					}
+					else
+					{
+						GUILayout.Label("Unlocked", new GUIStyle(label) { normal = { textColor = Color.green } });
+					}
 				}
-				else if (info.locked)
-				{
-					GUILayout.Label(lockedLabel, new GUIStyle(label) { normal = { textColor = Color.red } });
-					GUILayout.Label(info.LockedByMe ? meLabel : ownerLabel);
-				}
-				else
-				{
-					GUILayout.Label("Unlocked", new GUIStyle(label) { normal = { textColor = Color.green } });
-				}
-
-				GUILayout.FlexibleSpace();
 			}
 
 			async void DoFileAction(Func<Task> action)

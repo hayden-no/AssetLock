@@ -15,7 +15,7 @@ namespace AssetLock.Editor.Manager
 		private double m_refreshTimer;
 		private long m_refreshing;
 
-		internal bool Refreshing
+		private bool Refreshing
 		{
 			get => Interlocked.Read(ref m_refreshing) > 0;
 			set => Interlocked.Exchange(ref m_refreshing, value ? 1 : 0);
@@ -60,6 +60,7 @@ namespace AssetLock.Editor.Manager
 			}
 			
 			m_refreshTasks.Clear();
+			EditorApplication.RepaintProjectWindow();
 		}
 
 		private async void EditorLoop()
@@ -113,6 +114,7 @@ namespace AssetLock.Editor.Manager
 			return true;
 		}
 
+		// TODO: merge commands by dependency and run them in parallel
 		private async Task HandleCommandsAsync()
 		{
 			while (m_commandQueue.TryDequeue(out var command))

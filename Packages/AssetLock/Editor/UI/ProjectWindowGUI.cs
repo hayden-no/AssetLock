@@ -28,7 +28,7 @@ namespace AssetLock.Editor.UI
 
 			var reference = FileReference.FromGuid(guid);
 
-			if (!AssetLockManager.Instance.Repo.TryGetValue(reference, out var lockInfo))
+			if (!reference.TryGetLock(out var lockInfo))
 			{
 				return;
 			}
