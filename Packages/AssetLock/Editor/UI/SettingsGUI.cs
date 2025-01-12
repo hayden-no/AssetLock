@@ -246,6 +246,8 @@ namespace AssetLock.Editor.UI
 			SearchableToggle(m_parseFilesOnStartupLabel, ParseFilesOnStartup, ctx);
 			SearchableToggle(m_useblockingCallsInProcessorLabel, UseBlockingCallsInProcessor, ctx);
 			SearchableNumericField(m_refreshRateLabel, AssetLockSettings.RefreshRate, ctx);
+
+			Space();
 			
 			BeginSearchableGroup(m_gitCredentialsHeader, ctx);
 			SearchableEnumPopup(m_gitCredentialsTypeLabel, CredentialsType, ctx);
@@ -266,6 +268,7 @@ namespace AssetLock.Editor.UI
 			EndSearchableGroup(m_gitCredentialsHeader, ctx);
 
 			Space();
+			
 			SearchableFilePicker(
 				m_gitExeLabel,
 				GitPath,
