@@ -3,6 +3,8 @@ on:
   push:
     branches:
       - master
+permissions:
+  contents: write
 jobs:
   # All we need to do is to make Packages/AssetLock the project root (remove all other files)
   re-root:
