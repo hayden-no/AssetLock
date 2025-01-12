@@ -16,6 +16,7 @@ jobs:
       - name: Move
         # remove all folders and files except for ./Packages to start
         run: |
+          shopt -s extglob
           rm -rf !(Packages)
           mv Packages/AssetLock/* .
           rm -rf Packages
