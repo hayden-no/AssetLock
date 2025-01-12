@@ -72,3 +72,6 @@ crashlytics-build.properties
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
 
+# rider plugin files
+/.idea/.idea.AssetLock/.idea/discord.xml
+/.idea/.idea.AssetLock/.idea/indexLayout.xml
