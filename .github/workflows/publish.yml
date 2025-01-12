@@ -1,9 +1,11 @@
 name: Publish Unity Package
-on: [push]
+on: 
+  push:
+    branches:
+      - master
 jobs:
   # All we need to do is to make Packages/AssetLock the project root (remove all other files)
   re-root:
-    if: github.repository == 'AssetLock/master'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -26,8 +28,6 @@ jobs:
           git commit -m 'Re-root project to Packages/AssetLock'
           
       - name: Push changes
-        uses: ad-m/github-push-action@v2
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: package
-          force: true
+        run: git push origin HEAD:package
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
