@@ -31,6 +31,6 @@ jobs:
           git commit -m 'Re-root project to Packages/AssetLock'
           
       - name: Push changes
-        run: git push origin HEAD:package -force
+        run: git push origin HEAD:package --force
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
