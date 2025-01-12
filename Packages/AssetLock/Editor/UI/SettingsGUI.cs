@@ -161,7 +161,14 @@ namespace AssetLock.Editor.UI
 		readonly GUIContent m_gitDownloadLabel = new("Download Git", Constants.GIT_DOWNLOAD_URL);
 		readonly GUIContent m_gitLfsExeLabel = new("Git LFS Executable", "Path to git-lfs executable");
 		readonly GUIContent m_gitLfsDownloadLabel = new("Download Git LFS", Constants.GIT_LFS_DOWNLOAD_URL);
-		readonly GUIContent m_gitAuthTokenLabel = new("Git Remote Auth Token", "Remote auth token for git operations");
+		
+		readonly GUIContent m_gitCredentialsHeader = new("Git Credentials");
+		readonly GUIContent m_gitCredentialsTypeLabel = new("Git Credentials Type", "Type of credentials to use for git operations");
+		readonly GUIContent m_gitHubAuthTokenLabel = new("GitHub Remote Auth Token", "Remote auth token for github operations");
+		readonly GUIContent m_gitLabUsernameLabel = new("GitLab Username", "Username for gitlab operations");
+		readonly GUIContent m_gitLabAuthTokenLabel = new("GitLab Auth Token", "Auth token for gitlab operations");
+		readonly GUIContent m_gitCustomUsernameLabel = new("Username", "Username for git operations");
+		readonly GUIContent m_gitCustomPasswordLabel = new("Password", "Password for git operations");
 
 		readonly GUIContent m_debugLabel = new("Debug");
 		readonly GUIContent m_debugModeLabel = new("Debug Mode", "Enable/disable debug mode");
@@ -199,7 +206,13 @@ namespace AssetLock.Editor.UI
 			yield return m_gitDownloadLabel;
 			yield return m_gitLfsExeLabel;
 			yield return m_gitLfsDownloadLabel;
-			yield return m_gitAuthTokenLabel;
+			yield return m_gitCredentialsHeader;
+			yield return m_gitCredentialsTypeLabel;
+			yield return m_gitHubAuthTokenLabel;
+			yield return m_gitLabUsernameLabel;
+			yield return m_gitLabAuthTokenLabel;
+			yield return m_gitCustomUsernameLabel;
+			yield return m_gitCustomPasswordLabel;
 			yield return m_debugLabel;
 			yield return m_debugModeLabel;
 			yield return m_useHttpLabel;
@@ -233,11 +246,24 @@ namespace AssetLock.Editor.UI
 			SearchableToggle(m_parseFilesOnStartupLabel, ParseFilesOnStartup, ctx);
 			SearchableToggle(m_useblockingCallsInProcessorLabel, UseBlockingCallsInProcessor, ctx);
 			SearchableNumericField(m_refreshRateLabel, AssetLockSettings.RefreshRate, ctx);
-
-			if (UseHttp)
+			
+			BeginSearchableGroup(m_gitCredentialsHeader, ctx);
+			SearchableEnumPopup(m_gitCredentialsTypeLabel, CredentialsType, ctx);
+			switch (CredentialsType.value)
 			{
-				SearchableStringField(m_gitAuthTokenLabel, GitRemoteAuthToken, ctx);
+				case CredentialsKind.GitHub:
+					SearchableStringField(m_gitHubAuthTokenLabel, GitHubRemoteAuthToken, ctx);
+					break;
+				case CredentialsKind.GitLab:
+					SearchableStringField(m_gitLabUsernameLabel, GitLabRemoteUsername, ctx);
+					SearchableStringField(m_gitLabAuthTokenLabel, GitLabRemoteAuthToken, ctx);
+					break;
+				case CredentialsKind.UserPass:
+					SearchableStringField(m_gitCustomUsernameLabel, CredentialsUsername, ctx);
+					SearchableStringField(m_gitCustomPasswordLabel, CredentialsPassword, ctx);
+					break;
 			}
+			EndSearchableGroup(m_gitCredentialsHeader, ctx);
 
 			Space();
 			SearchableFilePicker(

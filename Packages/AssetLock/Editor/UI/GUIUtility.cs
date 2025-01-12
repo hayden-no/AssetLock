@@ -309,5 +309,21 @@ namespace AssetLock.Editor.UI
 				}
 			}
 		}
+		
+		public static void SearchableEnumPopup<T>(GUIContent label, UserSetting<T> setting, string ctx)
+			where T : Enum
+		{
+			if (MatchSearchGroups(ctx, label.text))
+			{
+				EditorGUI.BeginChangeCheck();
+
+				setting.value = (T)(object)EditorGUILayout.EnumPopup(label, setting.value);
+
+				if (EditorGUI.EndChangeCheck())
+				{
+					setting.ApplyModifiedProperties();
+				}
+			}
+		}
 	}
 }

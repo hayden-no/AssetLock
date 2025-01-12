@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using AssetLock.Editor.UI;
 using UnityEditor;
 using UnityEditor.SettingsManagement;
@@ -91,10 +92,23 @@ namespace AssetLock.Editor
 			TryGetDefaultGitLfsPath(out var path) ? path : Constants.DEFAULT_GIT_LFS_EXE
 		);
 		
+		internal static ALUserSetting<CredentialsKind> CredentialsType = new(
+			nameof(CredentialsType),
+			CredentialsKind.UserPass
+		);
+		
 		internal static ALUserSetting<string> GitWorkingDirectory = new(nameof(GitWorkingDirectory), string.Empty);
 		
-		internal static ALUserSetting<string> GitRemoteAuthToken = new(nameof(GitRemoteAuthToken), string.Empty);
-
+		internal static ALUserSetting<string> GitHubRemoteAuthToken = new(nameof(GitHubRemoteAuthToken), string.Empty);
+		
+		internal static ALUserSetting<string> GitLabRemoteUsername = new(nameof(GitLabRemoteUsername), string.Empty);
+		
+		internal static ALUserSetting<string> GitLabRemoteAuthToken = new(nameof(GitLabRemoteAuthToken), string.Empty);
+		
+		internal static ALUserSetting<string> CredentialsUsername = new(nameof(CredentialsUsername), string.Empty);
+		
+		internal static ALUserSetting<string> CredentialsPassword = new(nameof(CredentialsPassword), string.Empty);
+		
 	#endregion
 
 	#region Project Settings

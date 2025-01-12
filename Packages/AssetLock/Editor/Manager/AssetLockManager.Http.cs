@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -32,11 +33,35 @@ namespace AssetLock.Editor.Manager
 
 			return operation.webRequest;
 		}
+		
+		private string BearAuthHeader(string token)
+		{
+			return $"Bearer {token}";
+		}
+		
+		private string BasicAuthHeader(string username, string password)
+		{
+			byte[] bytes = Encoding.ASCII.GetBytes($"{username}:{password}");
+
+			return Convert.ToBase64String(bytes);
+		}
 
 		private void AppendHeaders(UnityWebRequest request)
 		{
 			request.SetRequestHeader("Accept", CONTENT_TYPE);
-			request.SetRequestHeader("Authorization", $"Bearer {GitRemoteAuthToken.value}");
+
+			if (IsGitHubUrl(request.url))
+			{
+				request.SetRequestHeader("Authorization", $"Bearer {BearAuthHeader(GitHubRemoteAuthToken)}");
+			}
+			else if (IsGitLabUrl(request.url))
+			{
+				request.SetRequestHeader("Authorization", $"Basic {BasicAuthHeader(GitLabRemoteUsername, GitLabRemoteAuthToken)}");
+			}
+			else
+			{
+				request.SetRequestHeader("Authorization", $"Basic {BasicAuthHeader(CredentialsUsername, CredentialsPassword)}");
+			}
 		}
 
 		private async Task<(bool, LockInfo)> CreateLockHttp(FileReference file, string serverRef = null)
@@ -98,6 +123,7 @@ namespace AssetLock.Editor.Manager
 			{
 				Logging.LogVerboseFormat("[HTTP] Received response: {0}", GetWebRequestLogMessage(webResult));
 			}
+
 			webResult.Dispose();
 
 			return result;
@@ -124,6 +150,7 @@ namespace AssetLock.Editor.Manager
 			{
 				Logging.LogVerboseFormat("[HTTP] Sending list request: {0}", GetWebRequestLogMessage(request));
 			}
+
 			request.downloadHandler = new DownloadHandlerBuffer();
 			var webResult = await SendAsync(request);
 			var result = (false, default(string), default(IEnumerable<LockInfo>));
@@ -165,6 +192,7 @@ namespace AssetLock.Editor.Manager
 			{
 				Logging.LogVerboseFormat("[HTTP] Received response: {0}", GetWebRequestLogMessage(webResult));
 			}
+
 			webResult.Dispose();
 
 			return result;
@@ -179,6 +207,7 @@ namespace AssetLock.Editor.Manager
 			{
 				Logging.LogVerboseFormat("[HTTP] Sending unlock request: {0}", GetWebRequestLogMessage(request));
 			}
+
 			request.downloadHandler = new DownloadHandlerBuffer();
 			var webResult = await SendAsync(request);
 			var result = (false, default(LockInfo));
@@ -219,6 +248,7 @@ namespace AssetLock.Editor.Manager
 			{
 				Logging.LogVerboseFormat("[HTTP] Received response: {0}", GetWebRequestLogMessage(webResult));
 			}
+
 			webResult.Dispose();
 
 			return result;
@@ -247,7 +277,7 @@ namespace AssetLock.Editor.Manager
 			{
 				Logging.LogVerboseFormat("[HTTP] Sending test request: {0}", GetWebRequestLogMessage(request));
 			}
-			
+
 			var webResult = await SendAsync(request);
 			var result = webResult.responseCode == HTTP_OK;
 			var err = result ? string.Empty : webResult.error;
@@ -256,6 +286,7 @@ namespace AssetLock.Editor.Manager
 			{
 				Logging.LogVerboseFormat("[HTTP] Received response: {0}", GetWebRequestLogMessage(webResult));
 			}
+
 			webResult.Dispose();
 
 			return (result, err);

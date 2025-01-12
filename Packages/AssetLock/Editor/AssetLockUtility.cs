@@ -222,6 +222,13 @@ namespace AssetLock.Editor
 			}
 		}
 
+		public enum CredentialsKind
+		{
+			GitHub,
+			GitLab,
+			UserPass,
+		}
+
 		private static class ControlChars
 		{
 			public const char NUL = (char)0; // Null
@@ -459,6 +466,16 @@ namespace AssetLock.Editor
 			}
 
 			return locks;
+		}
+
+		public static bool IsGitHubUrl(string url)
+		{
+			return url.Contains("github.com");
+		}
+		
+		public static bool IsGitLabUrl(string url)
+		{
+			return url.Contains("gitlab.com");
 		}
 	}
 }
