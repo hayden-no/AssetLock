@@ -364,5 +364,11 @@ namespace AssetLock.Editor.Manager
 			m_lockRepo.Clear();
 			Logging.Log("Reset Lock Cache");
 		}
+
+		internal async void InvalidGitHooksFix()
+		{
+			await ForceUpdateFix();
+			Reboot();
+		}
 	}
 }

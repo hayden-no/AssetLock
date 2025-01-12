@@ -238,6 +238,29 @@ namespace AssetLock.Editor.Manager
 			}
 		}
 
+		public async Task<(bool success, string err)> TestConnection()
+		{
+			var request = UnityWebRequest.Get(GitLfsServerLocksApiUrl);
+			AppendHeaders(request);
+
+			if (LogHttp)
+			{
+				Logging.LogVerboseFormat("[HTTP] Sending test request: {0}", GetWebRequestLogMessage(request));
+			}
+			
+			var webResult = await SendAsync(request);
+			var result = webResult.responseCode == HTTP_OK;
+			var err = result ? string.Empty : webResult.error;
+
+			if (LogHttp)
+			{
+				Logging.LogVerboseFormat("[HTTP] Received response: {0}", GetWebRequestLogMessage(webResult));
+			}
+			webResult.Dispose();
+
+			return (result, err);
+		}
+
 		private static void HandleUnknownError(UnityWebRequest request)
 		{
 			Logging.LogErrorFormat("[HTTP] Failed to access remote \n{0}\n", GetWebRequestLogMessage(request));

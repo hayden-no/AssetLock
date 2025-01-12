@@ -111,8 +111,16 @@ namespace AssetLock.Editor.Manager
 				m_lfsInitialized = true;
 				Logging.LogFormat("Git LFS initialized for user {0}", m_user);
 			}
+			
+			var env = await m_lfsProcess.RunCommandAsync(envCmd);
 
-			Logging.LogFormat("Git LFS environment: {0}", await m_lfsProcess.RunCommandAsync(envCmd));
+			if (TryGetLfsEndpointFromEnv(env.StdOut, out var url))
+			{
+				GitLfsServerUrl.SetValue(url);
+				GitLfsServerLocksApiUrl.SetValue(url + "/locks");
+			}
+
+			Logging.LogFormat("Git LFS environment: {0}", env);
 
 			if (string.IsNullOrWhiteSpace(GitWorkingDirectory))
 			{
@@ -130,6 +138,27 @@ namespace AssetLock.Editor.Manager
 			if (ParseFilesOnStartup)
 			{
 				ParseAll();
+			}
+		}
+
+		/// <summary>
+		/// Sometimes there's an issue with git-lfs install where it doesn't like a certain hook. <br/>
+		/// This will force update the hooks to fix the issue.
+		/// </summary>
+		private async Task ForceUpdateFix()
+		{
+			const string cmd = "update";
+			const string arg1 = "--force";
+			
+			const string expected = "Updated Git hooks.";
+
+			var result = await m_lfsProcess.RunCommandAsync(cmd, arg1);
+			
+			ThrowOnProcessError(result, "failed to force update");
+			
+			if (!result.StdOut.Contains(expected))
+			{
+				Logging.LogWarning("Failed to force update git hooks. Please check the git-lfs installation.");
 			}
 		}
 

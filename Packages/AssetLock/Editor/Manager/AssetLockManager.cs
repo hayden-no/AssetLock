@@ -96,6 +96,13 @@ namespace AssetLock.Editor.Manager
 
 		private AssetLockManager()
 		{
+			if (IsFirstTimeExperience)
+			{
+				RunFirstTimeUserExperience();
+
+				return;
+			}
+			
 			if (!MasterEnable)
 			{
 				return;
@@ -134,6 +141,21 @@ namespace AssetLock.Editor.Manager
 			EditorApplication.quitting -= Dispose;
 			
 			m_disposed = true;
+		}
+
+		private void RunFirstTimeUserExperience()
+		{
+			IsFirstTimeExperience.SetValue(false);
+			
+			const string title = "Setting up AssetLock";
+			const string message = @"Before using AssetLock some settings must be configured.
+Please configure both the user Preferences and Project Settings for AssetLock.
+Finally, reboot AssetLock to finish setup.  There is a button in the Lock Browser or Preferences window to do this.";
+			const string confirm = "OK";
+
+			EditorUtility.DisplayDialog(title, message, confirm);
+			
+			Debug.Log($"[AssetLock] {message}");
 		}
 
 		private void ThrowOnProcessError(ProcessResult result, string msg = "")

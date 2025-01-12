@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 using AssetLock.Editor.Data;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
+using UnityEditor;
 using UnityEngine;
 using static AssetLock.Editor.AssetLockSettings;
 
@@ -31,6 +32,11 @@ namespace AssetLock.Editor
 
 			public const string GIT_DOWNLOAD_URL = "https://git-scm.com/downloads";
 			public const string GIT_LFS_DOWNLOAD_URL = "https://git-lfs.github.com/";
+			
+			public const string GIT_LFS_SERVER_EXT = ".git/info/lfs";
+			public const string GIT_LFS_SERVER_LOCKS_API_EXT = "/locks";
+
+			public const string GIT_LFS_ENV_ENDPOINT = "Endpoint=";
 
 			public static readonly string[] DEFAULT_TRACKED_EXTENSIONS = new[] { ".prefab", ".unity", ".asset" };
 			public const int DEFAULT_QUICK_CHECK_SIZE = 4096;
@@ -332,6 +338,71 @@ namespace AssetLock.Editor
 			path = paths.Select(x => Path.Combine(x, Constants.DEFAULT_GIT_LFS_EXE)).FirstOrDefault(File.Exists);
 
 			return path != null;
+		}
+
+		public static string GetDefaultLfsEndpoint(string remoteUrl)
+		{
+			if (string.IsNullOrWhiteSpace(remoteUrl))
+			{
+				return string.Empty;
+			}
+
+			if (remoteUrl.StartsWith("http"))
+			{
+				if (remoteUrl.EndsWith(".git"))
+				{
+					var ext = Constants.GIT_LFS_SERVER_EXT.Replace(".git", "");
+					return remoteUrl + ext;
+				}
+				
+				return remoteUrl + Constants.GIT_LFS_SERVER_EXT;
+			}
+			if (remoteUrl.StartsWith("git"))
+			{
+				remoteUrl = remoteUrl.Replace("git@", "https://");
+				if (remoteUrl.EndsWith(".git"))
+				{
+					var ext = Constants.GIT_LFS_SERVER_EXT.Replace(".git", "");
+					return remoteUrl + ext;
+				}
+				
+				return remoteUrl + Constants.GIT_LFS_SERVER_EXT;
+			}
+			if (remoteUrl.StartsWith("ssh"))
+			{
+				remoteUrl = remoteUrl.Replace("ssh://", "https://");
+				if (remoteUrl.EndsWith(".git"))
+				{
+					var ext = Constants.GIT_LFS_SERVER_EXT.Replace(".git", "");
+					return remoteUrl + ext;
+				}
+				
+				return remoteUrl + Constants.GIT_LFS_SERVER_EXT;
+			}
+
+			return string.Empty;
+		}
+
+		public static bool TryGetLfsEndpointFromEnv(string env, out string endpointUrl)
+		{
+			endpointUrl = string.Empty;
+
+			int from = env.IndexOf(Constants.GIT_LFS_ENV_ENDPOINT, StringComparison.OrdinalIgnoreCase);
+			
+			if (from == -1)
+			{
+				return false;
+			}
+			
+			int to1 = env.IndexOf(" ", from, StringComparison.OrdinalIgnoreCase);
+			int to2 = env.IndexOf("\n", from, StringComparison.OrdinalIgnoreCase);
+			int to = to1 == -1 ? to2 : to2 == -1 ? to1 : Math.Min(to1, to2);
+			
+			from += Constants.GIT_LFS_ENV_ENDPOINT.Length;
+			
+			endpointUrl = env.Substring(from, to - from);
+			
+			return !string.IsNullOrWhiteSpace(endpointUrl);
 		}
 
 		public static string NormalizePath(string path)

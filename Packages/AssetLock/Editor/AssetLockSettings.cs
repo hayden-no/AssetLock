@@ -45,6 +45,8 @@ namespace AssetLock.Editor
 		}
 
 	#region User Settings
+		
+		internal static ALUserSetting<bool> IsFirstTimeExperience = new(nameof(IsFirstTimeExperience), true);
 
 		internal static ALUserSetting<bool> MasterEnable = new(nameof(MasterEnable), true);
 

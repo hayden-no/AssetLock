@@ -75,6 +75,8 @@ namespace AssetLock.Editor.UI
 			"Git LFS Server Locks",
 			"Server endpoint for git-lfs lock api operations"
 		);
+		
+		readonly GUIContent m_testConnectionLabel = new("Test Connection", "Test connection to the git server");
 
 		IEnumerable<GUIContent> GUIContents()
 		{
@@ -84,6 +86,7 @@ namespace AssetLock.Editor.UI
 			yield return m_gitRemoteUrlLabel;
 			yield return m_gitLfsServerLabel;
 			yield return m_gitLfsServerLocksLabel;
+			yield return m_testConnectionLabel;
 		}
 
 		protected override IEnumerable<string> GetSettingNames()
@@ -99,12 +102,44 @@ namespace AssetLock.Editor.UI
 			BeginSearchableGroup(m_configLabel, ctx);
 			SearchableNumericField(m_quickCheckLabel, QuickCheckSize, ctx);
 			SearchableToggle(m_trackNonBinaryFilesLabel, TrackNonBinaryFiles, ctx);
+			EditorGUI.BeginChangeCheck();
 			SearchableStringField(m_gitRemoteUrlLabel, GitRemoteUrl, ctx);
+			if (EditorGUI.EndChangeCheck())
+			{
+				if (string.IsNullOrEmpty(GitLfsServerUrl))
+				{
+					GitLfsServerUrl.value = GetDefaultLfsEndpoint(GitRemoteUrl); 
+					GitLfsServerUrl.ApplyModifiedProperties();
+				}
+				if (string.IsNullOrEmpty(GitLfsServerLocksApiUrl))
+				{
+					GitLfsServerLocksApiUrl.value = GitLfsServerUrl + Constants.GIT_LFS_SERVER_LOCKS_API_EXT;
+					GitLfsServerLocksApiUrl.ApplyModifiedProperties();
+				}
+			}
 			SearchableStringField(m_gitLfsServerLabel, GitLfsServerUrl, ctx);
 			SearchableStringField(m_gitLfsServerLocksLabel, GitLfsServerLocksApiUrl, ctx);
+			if (Button(m_testConnectionLabel))
+			{
+				TestConnection();
+			}
 			Space();
 			SearchableStringList(m_trackedExtensionsLabel, TrackedFileEndings, ctx);
 			EndSearchableGroup(m_configLabel, ctx);
+		}
+
+		async void TestConnection()
+		{
+			(var successs, var err) = await AssetLockManager.Instance.TestConnection();
+			
+			if (successs)
+			{
+				EditorUtility.DisplayDialog("Connection Test", "Connection successful!", "OK");
+			}
+			else
+			{
+				EditorUtility.DisplayDialog("Connection Test", $"Connection failed: {err}", "OK");
+			}
 		}
 	}
 
@@ -146,6 +181,7 @@ namespace AssetLock.Editor.UI
 		readonly GUIContent m_printLocksLabel = new("Print Locks", "Print all locks");
 		readonly GUIContent m_clearLocksLabel = new("Clear Locks", "Clear all locks");
 		readonly GUIContent m_parseAllAssetsLabel = new("Parse All Assets", "Parse all assets for lockable files");
+		readonly GUIContent m_gitLfsHooksFix = new("Invalid Git LFS Hooks Fix", "Attempt to fix the invalid git lfs hooks error by force updating git lfs");
 
 		readonly GUIContent m_loggingLabel = new("Logging");
 		readonly GUIContent m_infoLoggingLabel = new("Info Logging", "Enable/disable info logging");
@@ -177,6 +213,8 @@ namespace AssetLock.Editor.UI
 			yield return m_rebootLabel;
 			yield return m_printLocksLabel;
 			yield return m_clearLocksLabel;
+			yield return m_parseAllAssetsLabel;
+			yield return m_gitLfsHooksFix;
 		}
 
 		protected override IEnumerable<string> GetSettingNames()
@@ -252,6 +290,7 @@ namespace AssetLock.Editor.UI
 					SearchableButton(m_printLocksLabel, ctx, () => AssetLockManager.Instance.PrintLockRepo());
 					SearchableButton(m_clearLocksLabel, ctx, () => AssetLockManager.Instance.ResetLockRepo());
 					SearchableButton(m_parseAllAssetsLabel, ctx, () => AssetLockManager.Instance.ParseAll());
+					SearchableButton(m_gitLfsHooksFix, ctx, () => AssetLockManager.Instance.InvalidGitHooksFix());
 				}
 			}
 

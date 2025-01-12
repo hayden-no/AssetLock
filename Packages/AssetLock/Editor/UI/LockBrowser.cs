@@ -49,6 +49,11 @@ namespace AssetLock.Editor.UI
 
 		private void InfoGUI()
 		{
+			if (AssetLockManager.Instance is null)
+			{
+				return;
+			}
+			
 			GUIContent labelContent = new GUIContent("File Count:");
 			GUIContent trackedCount = new GUIContent(
 				AssetLockManager.Instance.TrackedCount.ToString(),
@@ -112,6 +117,16 @@ namespace AssetLock.Editor.UI
 			GUIContent expandAllLabel = new GUIContent("Expand All", "Expand all directories");
 			GUIContent collapseAllLabel = new GUIContent("Collapse All", "Collapse all directories");
 
+			if (AssetLockManager.Instance is null)
+			{
+				if (GUILayout.Button(rebootLabel))
+				{
+					AssetLockManager.Reboot();
+				}
+
+				return;
+			}
+
 			GUILayout.Label("Actions:", boldLabel);
 			EditorGUI.BeginDisabledGroup(s_busy);
 
@@ -170,6 +185,11 @@ namespace AssetLock.Editor.UI
 
 		private void FilesGUI()
 		{
+			if (AssetLockManager.Instance is null)
+			{
+				return;
+			}
+			
 			GUIContent refreshLabel = EditorGUIUtility.IconContent("d_Refresh");
 
 			using (new HorizontalScope())
