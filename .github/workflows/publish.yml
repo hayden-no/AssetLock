@@ -1,9 +1,11 @@
 name: Publish Unity Package
-on: [push]
+on: 
+  push:
+    branches:
+      - master
 jobs:
   # All we need to do is to make Packages/AssetLock the project root (remove all other files)
   re-root:
-    if: github.repository == 'AssetLock/master'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
