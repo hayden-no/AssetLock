@@ -198,11 +198,25 @@ namespace AssetLock.Editor.UI
 		{
 			if (Get(out FileReference reference, out LockInfo info))
 			{
-				Logging.Log(info.ToString());
+				if (AddAssetReferenceToLogs)
+				{
+					Logging.Log(reference.MainAsset, info.ToString());
+				}
+				else
+				{
+					Logging.Log(info.ToString());
+				}
 			}
 			else if (reference.Exists)
 			{
-				Logging.Log(reference.ToString());
+				if (AddAssetReferenceToLogs)
+				{
+					Logging.Log(reference.MainAsset, reference.ToString());
+				}
+				else
+				{
+					Logging.Log(reference.ToString());
+				}
 			}
 			else
 			{

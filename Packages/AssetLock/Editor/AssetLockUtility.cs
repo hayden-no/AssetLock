@@ -27,7 +27,7 @@ namespace AssetLock.Editor
 
 			public const string DEFAULT_GIT_EXE = "git.exe";
 			public const string DEFAULT_GIT_LFS_EXE = "git-lfs.exe";
-			
+
 			// unity adds the '.' to the extension
 			public const string EXE_FILE_KIND = "exe";
 
@@ -35,7 +35,7 @@ namespace AssetLock.Editor
 
 			public const string GIT_DOWNLOAD_URL = "https://git-scm.com/downloads";
 			public const string GIT_LFS_DOWNLOAD_URL = "https://git-lfs.github.com/";
-			
+
 			public const string GIT_LFS_SERVER_EXT = ".git/info/lfs";
 			public const string GIT_LFS_SERVER_LOCKS_API_EXT = "/locks";
 
@@ -48,7 +48,7 @@ namespace AssetLock.Editor
 
 			public const string PROJECT_SETTINGS_PROVIDER_PATH = "Project/AssetLock";
 			public const string USER_SETTINGS_PROVIDER_PATH = "Preferences/AssetLock";
-			
+
 			public const string BROWSER_MENU_PATH = "Window/" + BROWSER_TITLE;
 			public const string BROWSER_TITLE = "Asset Lock Browser";
 			public const string BROWSER_ICON = "AssemblyLock";
@@ -59,7 +59,7 @@ namespace AssetLock.Editor
 				Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.Machine) +
 				";" +
 				Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User);
-			
+
 			public const string FILE_SYSTEM_UP_DIR = "..";
 
 			public const int DEFAULT_LOCK_TIMEOUT = 2500;
@@ -78,6 +78,28 @@ namespace AssetLock.Editor
 				return LOG_PREFIX + message;
 			}
 
+			static bool HasReference(object[] args, out FileReference reference)
+			{
+				reference = default;
+
+				if (!AddAssetReferenceToLogs)
+				{
+					return false;
+				}
+
+				foreach (var arg in args)
+				{
+					if (arg is FileReference)
+					{
+						reference = (FileReference)arg;
+
+						return true;
+					}
+				}
+
+				return false;
+			}
+
 			// ReSharper disable Unity.PerformanceAnalysis
 			[HideInCallstack]
 			public static void LogVerbose(string message)
@@ -87,7 +109,7 @@ namespace AssetLock.Editor
 					UnityEngine.Debug.Log(GetMessage(message));
 				}
 			}
-			
+
 			// ReSharper disable Unity.PerformanceAnalysis
 			[HideInCallstack]
 			public static void LogVerbose(Object context, string message)
@@ -105,10 +127,17 @@ namespace AssetLock.Editor
 			{
 				if (DebugMode && VerboseLogging)
 				{
-					UnityEngine.Debug.LogFormat(GetMessage(format),args);
+					if (HasReference(args, out var reference))
+					{
+						LogVerboseFormat(reference.MainAsset, format, args);
+					}
+					else
+					{
+						UnityEngine.Debug.LogFormat(GetMessage(format), args);
+					}
 				}
 			}
-			
+
 			// ReSharper disable Unity.PerformanceAnalysis
 			[StringFormatMethod("format")]
 			[HideInCallstack]
@@ -129,7 +158,7 @@ namespace AssetLock.Editor
 					UnityEngine.Debug.Log(GetMessage(message));
 				}
 			}
-			
+
 			// ReSharper disable Unity.PerformanceAnalysis
 			[HideInCallstack]
 			public static void Log(Object context, string message)
@@ -147,10 +176,17 @@ namespace AssetLock.Editor
 			{
 				if (InfoLogging)
 				{
-					UnityEngine.Debug.LogFormat(GetMessage(format), args);
+					if (HasReference(args, out var reference))
+					{
+						LogFormat(reference.MainAsset, format, args);
+					}
+					else
+					{
+						UnityEngine.Debug.LogFormat(GetMessage(format), args);
+					}
 				}
 			}
-			
+
 			// ReSharper disable Unity.PerformanceAnalysis
 			[StringFormatMethod("format")]
 			[HideInCallstack]
@@ -171,7 +207,7 @@ namespace AssetLock.Editor
 					UnityEngine.Debug.LogWarning(GetMessage(message));
 				}
 			}
-			
+
 			// ReSharper disable Unity.PerformanceAnalysis
 			[HideInCallstack]
 			public static void LogWarning(Object context, string message)
@@ -189,10 +225,17 @@ namespace AssetLock.Editor
 			{
 				if (WarningLogging)
 				{
-					UnityEngine.Debug.LogWarningFormat(GetMessage(format), args);
+					if (HasReference(args, out var reference))
+					{
+						LogWarningFormat(reference.MainAsset, format, args);
+					}
+					else
+					{
+						UnityEngine.Debug.LogWarningFormat(GetMessage(format), args);
+					}
 				}
 			}
-			
+
 			// ReSharper disable Unity.PerformanceAnalysis
 			[StringFormatMethod("format")]
 			[HideInCallstack]
@@ -213,7 +256,7 @@ namespace AssetLock.Editor
 					UnityEngine.Debug.LogError(GetMessage(message));
 				}
 			}
-			
+
 			// ReSharper disable Unity.PerformanceAnalysis
 			[HideInCallstack]
 			public static void LogError(Object context, string message)
@@ -231,10 +274,18 @@ namespace AssetLock.Editor
 			{
 				if (ErrorLogging)
 				{
+					if (HasReference(args, out var reference))
+					{
+						LogErrorFormat(reference.MainAsset, format, args);
+					}
+					else
+					{
+						UnityEngine.Debug.LogErrorFormat(GetMessage(format), args);
+					}
 					UnityEngine.Debug.LogErrorFormat(GetMessage(format), args);
 				}
 			}
-			
+
 			// ReSharper disable Unity.PerformanceAnalysis
 			[StringFormatMethod("format")]
 			[HideInCallstack]
@@ -312,9 +363,7 @@ namespace AssetLock.Editor
 
 		public enum CredentialsKind
 		{
-			GitHub,
-			GitLab,
-			UserPass,
+			GitHub, GitLab, UserPass,
 		}
 
 		private static class ControlChars
@@ -447,31 +496,38 @@ namespace AssetLock.Editor
 				if (remoteUrl.EndsWith(".git"))
 				{
 					var ext = Constants.GIT_LFS_SERVER_EXT.Replace(".git", "");
+
 					return remoteUrl + ext;
 				}
-				
+
 				return remoteUrl + Constants.GIT_LFS_SERVER_EXT;
 			}
+
 			if (remoteUrl.StartsWith("git"))
 			{
 				remoteUrl = remoteUrl.Replace("git@", "https://");
+
 				if (remoteUrl.EndsWith(".git"))
 				{
 					var ext = Constants.GIT_LFS_SERVER_EXT.Replace(".git", "");
+
 					return remoteUrl + ext;
 				}
-				
+
 				return remoteUrl + Constants.GIT_LFS_SERVER_EXT;
 			}
+
 			if (remoteUrl.StartsWith("ssh"))
 			{
 				remoteUrl = remoteUrl.Replace("ssh://", "https://");
+
 				if (remoteUrl.EndsWith(".git"))
 				{
 					var ext = Constants.GIT_LFS_SERVER_EXT.Replace(".git", "");
+
 					return remoteUrl + ext;
 				}
-				
+
 				return remoteUrl + Constants.GIT_LFS_SERVER_EXT;
 			}
 
@@ -483,20 +539,20 @@ namespace AssetLock.Editor
 			endpointUrl = string.Empty;
 
 			int from = env.IndexOf(Constants.GIT_LFS_ENV_ENDPOINT, StringComparison.OrdinalIgnoreCase);
-			
+
 			if (from == -1)
 			{
 				return false;
 			}
-			
+
 			int to1 = env.IndexOf(" ", from, StringComparison.OrdinalIgnoreCase);
 			int to2 = env.IndexOf("\n", from, StringComparison.OrdinalIgnoreCase);
 			int to = to1 == -1 ? to2 : to2 == -1 ? to1 : Math.Min(to1, to2);
-			
+
 			from += Constants.GIT_LFS_ENV_ENDPOINT.Length;
-			
+
 			endpointUrl = env.Substring(from, to - from);
-			
+
 			return !string.IsNullOrWhiteSpace(endpointUrl);
 		}
 
@@ -528,7 +584,7 @@ namespace AssetLock.Editor
 		{
 			return Path.GetRelativePath(Path.Combine(Application.dataPath, "..\\"), path);
 		}
-		
+
 		public static string ToUnityAssetsRelativePath(string path)
 		{
 			return Path.GetRelativePath(Application.dataPath, path);
@@ -560,7 +616,7 @@ namespace AssetLock.Editor
 		{
 			return url.Contains("github.com");
 		}
-		
+
 		public static bool IsGitLabUrl(string url)
 		{
 			return url.Contains("gitlab.com");
