@@ -595,6 +595,31 @@ namespace AssetLock.Editor
 			return Path.GetRelativePath(GitWorkingDirectory, path);
 		}
 
+		public static string GetFullPath(string path)
+		{
+			if (path.Contains(":"))
+			{
+				// path is already a full path
+				return path;
+			}
+			
+			if (path.StartsWith(GitWorkingDirectory))
+			{
+				// remove the git working directory
+				path = path.Replace(GitWorkingDirectory, string.Empty);
+				// remove the leading slash
+				path = path[1..];
+			}
+
+			if (path.StartsWith("Assets"))
+			{
+				// Assets length is 6 plus the leading slash
+				path = path[7..];
+			}
+			
+			return Path.Combine(Application.dataPath, path);
+		}
+
 		public static string GetPathWithoutMeta(string path)
 		{
 			return path.EndsWith(".meta") ? path.Substring(0, path.Length - 5) : path;

@@ -30,7 +30,7 @@ namespace AssetLock.Editor.Data
 			// sanitize path
 			path = path.Replace("\"", string.Empty);
 
-			this.AbsolutePath = Path.GetFullPath(path);
+			this.AbsolutePath = AssetLockUtility.GetFullPath(path);
 		}
 
 		public string Name => Path.GetFileNameWithoutExtension(this.AbsolutePath);
