@@ -58,7 +58,7 @@ namespace AssetLock.Editor.Data
 
 		public override int GetHashCode()
 		{
-			return HashCode.Combine(guid, path, name, locked, lockId, owner, lockedAt);
+			return ((FileReference)this).GetHashCode();
 		}
 	}
 }
