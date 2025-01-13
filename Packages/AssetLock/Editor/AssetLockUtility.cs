@@ -629,19 +629,15 @@ namespace AssetLock.Editor
 				return info.FullName;
 			}
 
-			string topDir;
-
-			do
+			path = Path.GetFullPath(path);
+			
+			if (path.Contains(":"))
 			{
-				topDir = Path.GetPathRoot(path);
-				var toSkip = topDir.Length + 1;
-				path = path[toSkip..];
-
-				if (topDir == "Assets")
-				{
-					break;
-				}
-			} while (topDir != null && topDir != string.Empty);
+				// path is already a full path
+				return path;
+			}
+			
+			path = Path.GetRelativePath(Application.dataPath, path);
 
 			return Path.Combine(Application.dataPath, path);
 		}
