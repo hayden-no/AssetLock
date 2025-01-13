@@ -74,13 +74,15 @@ namespace AssetLock.Editor
 
 		internal static ALUserSetting<double> ProfilingMinTimeMs = new(nameof(ProfilingMinTimeMs), 500);
 
-		internal static ALUserSetting<bool> VerboseLogging = new(nameof(VerboseLogging), true);
+		internal static ALUserSetting<bool> VerboseLogging = new(nameof(VerboseLogging), false);
 
 		internal static ALUserSetting<bool> InfoLogging = new(nameof(InfoLogging), true);
 
 		internal static ALUserSetting<bool> WarningLogging = new(nameof(WarningLogging), true);
 
 		internal static ALUserSetting<bool> ErrorLogging = new(nameof(ErrorLogging), true);
+		
+		internal static ALUserSetting<bool> AddAssetReferenceToLogs = new(nameof(AddAssetReferenceToLogs), true);
 
 		internal static ALUserSetting<string> GitPath = new(
 			nameof(GitPath),

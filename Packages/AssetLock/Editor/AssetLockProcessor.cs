@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using AssetLock.Editor.Data;
 using AssetLock.Editor.Manager;
+using JetBrains.Annotations;
 using UnityEditor;
 using static AssetLock.Editor.AssetLockSettings;
 using static AssetLock.Editor.AssetLockUtility;
@@ -179,7 +180,7 @@ namespace AssetLock.Editor
 			}
 			else if (info is { locked: true, LockedByMe: false })
 			{
-				Logging.LogWarningFormat(
+				LogReferenceWarningFormat(path,
 					"Cannot delete locked asset {0} because it is locked by {1}.",
 					assetPath,
 					info.owner
@@ -218,7 +219,7 @@ namespace AssetLock.Editor
 			}
 			else if (info is { locked: true, LockedByMe: false })
 			{
-				Logging.LogWarningFormat(
+				LogReferenceWarningFormat(path,
 					"Cannot move locked asset {0} because it is locked by {1}.",
 					sourcePath,
 					info.owner
@@ -255,8 +256,8 @@ namespace AssetLock.Editor
 				{
 					path.TrackFile();
 				}
-
-				Logging.LogVerboseFormat("File mode changed for {0} to {1}", path, mode);
+				
+				LogReferenceVerboseFormat(path, "File mode changed for {0} to {1}", path, mode);
 			}
 		}
 
@@ -280,6 +281,7 @@ namespace AssetLock.Editor
 			if (blocking)
 			{
 				reference.TrackFileAsync().Wait(Constants.DEFAULT_LOCK_TIMEOUT);
+
 				return GetLock(reference, false, out info);
 			}
 			else
@@ -308,14 +310,15 @@ namespace AssetLock.Editor
 					reference.LockFileAsync().Wait(Constants.DEFAULT_LOCK_TIMEOUT);
 				}
 
-				Logging.LogFormat("Automatically locked asset {0} because it is binary.", reference.UnityPath);
+				LogReferenceFormat(reference, "Automatically locked asset {0} because it is binary.", reference.UnityPath);
 
 				return true;
 			}
 			else
 			{
-				Logging.LogWarningFormat(
-					"Cannot {0} lockable asset {1}.  Please check it out first!",
+				LogReferenceWarningFormat(
+					reference,
+					"Cannot {0} lockable asset {1}. Please check it out first!",
 					action,
 					reference.UnityPath
 				);
@@ -344,6 +347,45 @@ namespace AssetLock.Editor
 					break;
 				default:
 					throw new ArgumentOutOfRangeException(nameof(option), option, null);
+			}
+		}
+
+		[StringFormatMethod("format")]
+		private static void LogReferenceFormat(FileReference reference, string format, params object[] args)
+		{
+			if (AddAssetReferenceToLogs)
+			{
+				Logging.LogFormat(reference.MainAsset, format, args);
+			}
+			else
+			{
+				Logging.LogFormat(format, args);
+			}
+		}
+		
+		[StringFormatMethod("format")]
+		private static void LogReferenceVerboseFormat(FileReference reference, string format, params object[] args)
+		{
+			if (AddAssetReferenceToLogs)
+			{
+				Logging.LogVerboseFormat(reference.MainAsset, format, args);
+			}
+			else
+			{
+				Logging.LogVerboseFormat(format, args);
+			}
+		}
+
+		[StringFormatMethod("format")]
+		private static void LogReferenceWarningFormat(FileReference reference, string format, params object[] args)
+		{
+			if (AddAssetReferenceToLogs)
+			{
+				Logging.LogWarningFormat(reference.MainAsset, format, args);
+			}
+			else
+			{
+				Logging.LogWarningFormat(format, args);
 			}
 		}
 	}

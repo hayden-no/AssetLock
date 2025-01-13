@@ -101,7 +101,9 @@ namespace AssetLock.Editor.Manager
 			const string installCmd = "install";
 			const string envCmd = "env";
 
-			ThrowOnProcessError(await m_lfsProcess.RunCommandAsync(installCmd), "failed to initialize git-lfs");
+			var init = await m_lfsProcess.RunCommandAsync(installCmd);
+			CheckForFailedHooks(init);
+			ThrowOnProcessError(init, "failed to initialize git-lfs");
 
 			string user = await GetGitUser();
 

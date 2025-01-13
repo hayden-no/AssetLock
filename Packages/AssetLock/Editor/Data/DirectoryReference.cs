@@ -13,7 +13,7 @@ namespace AssetLock.Editor.Data
 	/// <summary>
 	/// Represents a directory on the file system.
 	/// </summary>
-	internal readonly struct DirectoryReference
+	internal readonly struct DirectoryReference : IEquatable<DirectoryReference>
 	{
 		public readonly string AbsolutePath;
 
@@ -320,6 +320,11 @@ namespace AssetLock.Editor.Data
 		public override int GetHashCode()
 		{
 			return this.AbsolutePath.GetHashCode();
+		}
+
+		public bool Equals(DirectoryReference other)
+		{
+			return AbsolutePath == other.AbsolutePath;
 		}
 	}
 }

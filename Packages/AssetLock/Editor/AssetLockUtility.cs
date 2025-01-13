@@ -10,6 +10,7 @@ using Newtonsoft.Json;
 using UnityEditor;
 using UnityEngine;
 using static AssetLock.Editor.AssetLockSettings;
+using Object = UnityEngine.Object;
 
 namespace AssetLock.Editor
 {
@@ -26,7 +27,9 @@ namespace AssetLock.Editor
 
 			public const string DEFAULT_GIT_EXE = "git.exe";
 			public const string DEFAULT_GIT_LFS_EXE = "git-lfs.exe";
-			public const string EXE_EXTENSION = ".exe";
+			
+			// unity adds the '.' to the extension
+			public const string EXE_FILE_KIND = "exe";
 
 			public const string GIT_EXE_DIRECTORY_PATH = "C\\Program Files";
 
@@ -69,6 +72,7 @@ namespace AssetLock.Editor
 		{
 			const string LOG_PREFIX = "[AssetLock] ";
 
+			[HideInCallstack]
 			static string GetMessage(string message)
 			{
 				return LOG_PREFIX + message;
@@ -83,6 +87,16 @@ namespace AssetLock.Editor
 					UnityEngine.Debug.Log(GetMessage(message));
 				}
 			}
+			
+			// ReSharper disable Unity.PerformanceAnalysis
+			[HideInCallstack]
+			public static void LogVerbose(Object context, string message)
+			{
+				if (DebugMode && VerboseLogging)
+				{
+					UnityEngine.Debug.Log(GetMessage(message), context);
+				}
+			}
 
 			// ReSharper disable Unity.PerformanceAnalysis
 			[StringFormatMethod("format")]
@@ -94,6 +108,17 @@ namespace AssetLock.Editor
 					UnityEngine.Debug.LogFormat(GetMessage(format),args);
 				}
 			}
+			
+			// ReSharper disable Unity.PerformanceAnalysis
+			[StringFormatMethod("format")]
+			[HideInCallstack]
+			public static void LogVerboseFormat(Object context, string format, params object[] args)
+			{
+				if (DebugMode && VerboseLogging)
+				{
+					UnityEngine.Debug.LogFormat(context, GetMessage(format), args);
+				}
+			}
 
 			// ReSharper disable Unity.PerformanceAnalysis
 			[HideInCallstack]
@@ -102,6 +127,16 @@ namespace AssetLock.Editor
 				if (InfoLogging)
 				{
 					UnityEngine.Debug.Log(GetMessage(message));
+				}
+			}
+			
+			// ReSharper disable Unity.PerformanceAnalysis
+			[HideInCallstack]
+			public static void Log(Object context, string message)
+			{
+				if (InfoLogging)
+				{
+					UnityEngine.Debug.Log(GetMessage(message), context);
 				}
 			}
 
@@ -115,6 +150,17 @@ namespace AssetLock.Editor
 					UnityEngine.Debug.LogFormat(GetMessage(format), args);
 				}
 			}
+			
+			// ReSharper disable Unity.PerformanceAnalysis
+			[StringFormatMethod("format")]
+			[HideInCallstack]
+			public static void LogFormat(Object context, string format, params object[] args)
+			{
+				if (InfoLogging)
+				{
+					UnityEngine.Debug.LogFormat(context, GetMessage(format), args);
+				}
+			}
 
 			// ReSharper disable Unity.PerformanceAnalysis
 			[HideInCallstack]
@@ -123,6 +169,16 @@ namespace AssetLock.Editor
 				if (WarningLogging)
 				{
 					UnityEngine.Debug.LogWarning(GetMessage(message));
+				}
+			}
+			
+			// ReSharper disable Unity.PerformanceAnalysis
+			[HideInCallstack]
+			public static void LogWarning(Object context, string message)
+			{
+				if (WarningLogging)
+				{
+					UnityEngine.Debug.LogWarning(GetMessage(message), context);
 				}
 			}
 
@@ -136,6 +192,17 @@ namespace AssetLock.Editor
 					UnityEngine.Debug.LogWarningFormat(GetMessage(format), args);
 				}
 			}
+			
+			// ReSharper disable Unity.PerformanceAnalysis
+			[StringFormatMethod("format")]
+			[HideInCallstack]
+			public static void LogWarningFormat(Object context, string format, params object[] args)
+			{
+				if (WarningLogging)
+				{
+					UnityEngine.Debug.LogWarningFormat(context, GetMessage(format), args);
+				}
+			}
 
 			// ReSharper disable Unity.PerformanceAnalysis
 			[HideInCallstack]
@@ -144,6 +211,16 @@ namespace AssetLock.Editor
 				if (ErrorLogging)
 				{
 					UnityEngine.Debug.LogError(GetMessage(message));
+				}
+			}
+			
+			// ReSharper disable Unity.PerformanceAnalysis
+			[HideInCallstack]
+			public static void LogError(Object context, string message)
+			{
+				if (ErrorLogging)
+				{
+					UnityEngine.Debug.LogError(GetMessage(message), context);
 				}
 			}
 
@@ -155,6 +232,17 @@ namespace AssetLock.Editor
 				if (ErrorLogging)
 				{
 					UnityEngine.Debug.LogErrorFormat(GetMessage(format), args);
+				}
+			}
+			
+			// ReSharper disable Unity.PerformanceAnalysis
+			[StringFormatMethod("format")]
+			[HideInCallstack]
+			public static void LogErrorFormat(Object context, string format, params object[] args)
+			{
+				if (ErrorLogging)
+				{
+					UnityEngine.Debug.LogErrorFormat(context, GetMessage(format), args);
 				}
 			}
 

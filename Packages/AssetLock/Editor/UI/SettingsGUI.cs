@@ -194,6 +194,7 @@ namespace AssetLock.Editor.UI
 		readonly GUIContent m_infoLoggingLabel = new("Info Logging", "Enable/disable info logging");
 		readonly GUIContent m_warningLoggingLabel = new("Warning Logging", "Enable/disable warning logging");
 		readonly GUIContent m_errorLoggingLabel = new("Error Logging", "Enable/disable error logging");
+		readonly GUIContent m_addAssetReferenceToLogsLabel = new("Add Asset Reference To Logs", "Enable/disable adding asset reference to logs (this involves loading the asset)");
 
 		IEnumerable<GUIContent> GUIContents()
 		{
@@ -222,6 +223,7 @@ namespace AssetLock.Editor.UI
 			yield return m_infoLoggingLabel;
 			yield return m_warningLoggingLabel;
 			yield return m_errorLoggingLabel;
+			yield return m_addAssetReferenceToLogsLabel;
 			yield return m_enableProfilingLabel;
 			yield return m_rebootLabel;
 			yield return m_printLocksLabel;
@@ -274,7 +276,7 @@ namespace AssetLock.Editor.UI
 				GitPath,
 				ctx,
 				Constants.GIT_EXE_DIRECTORY_PATH,
-				Constants.EXE_EXTENSION,
+				Constants.EXE_FILE_KIND,
 				m_gitDownloadLabel,
 				Constants.GIT_DOWNLOAD_URL
 			);
@@ -283,7 +285,7 @@ namespace AssetLock.Editor.UI
 				GitLfsPath,
 				ctx,
 				Constants.GIT_EXE_DIRECTORY_PATH,
-				Constants.EXE_EXTENSION,
+				Constants.EXE_FILE_KIND,
 				m_gitLfsDownloadLabel,
 				Constants.GIT_LFS_DOWNLOAD_URL
 			);
@@ -310,6 +312,7 @@ namespace AssetLock.Editor.UI
 				SearchableToggle(m_enableProfilingLabel, EnableProfiling, ctx);
 				SearchableNumericField(m_profilingMinTimeLabel, ProfilingMinTimeMs, ctx);
 				SearchableToggle(m_verboseLoggingLabel, VerboseLogging, ctx);
+				SearchableToggle(m_addAssetReferenceToLogsLabel, AddAssetReferenceToLogs, ctx);
 
 				using (new EditorGUILayout.HorizontalScope())
 				{

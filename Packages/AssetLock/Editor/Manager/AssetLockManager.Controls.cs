@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using AssetLock.Editor.Data;
+using UnityEditor;
 using static AssetLock.Editor.AssetLockUtility;
 
 namespace AssetLock.Editor.Manager
@@ -367,8 +368,45 @@ namespace AssetLock.Editor.Manager
 
 		internal async void InvalidGitHooksFix()
 		{
+			const string title = "AssetLock - Invalid Git Hooks";
+			const string message = @"Git-Lfs failed to initialize due to bad git hooks. Would you like to attempt to fix them?
+AssetLock will remain disabled until the hooks are fixed.
+
+WARNING: This will overwrite any existing hooks.";
+			const string confirm = "Fix";
+			const string cancel = "Cancel";
+			const string key = Constants.PACKAGE_NAME + ".InvalidGitHooksFix";
+
+			if (!EditorUtility.DisplayDialog(
+					title,
+					message,
+					confirm,
+					cancel,
+					DialogOptOutDecisionType.ForThisMachine,
+					key
+				))
+			{
+				AssetLockSettings.MasterEnable.SetValue(false, true);
+				return;
+			}
+			
 			await ForceUpdateFix();
 			Reboot();
+		}
+
+		private void CheckForFailedHooks(ProcessResult installResult)
+		{
+			const string hookErr = "Hook already exists: ";
+			
+			if (!installResult.HasErrText)
+			{
+				return;
+			}
+			
+			if (installResult.StdErr.Contains(hookErr))
+			{
+				InvalidGitHooksFix();
+			}
 		}
 	}
 }

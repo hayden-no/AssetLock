@@ -4,13 +4,14 @@ using System.Text;
 using System.Threading.Tasks;
 using AssetLock.Editor.Manager;
 using UnityEditor;
+using Object = UnityEngine.Object;
 
 namespace AssetLock.Editor.Data
 {
 	/// <summary>
 	/// Represents a file on the file system.
 	/// </summary>
-	internal readonly struct FileReference
+	internal readonly struct FileReference : IEquatable<FileReference>
 	{
 		public readonly string AbsolutePath;
 
@@ -48,6 +49,7 @@ namespace AssetLock.Editor.Data
 		public DirectoryReference Directory => DirectoryReference.FromFile(this);
 		public FileReference Meta => new FileReference(UnityMetaPath, true);
 		public bool IsMeta => this.AbsolutePath.EndsWith(".meta", StringComparison.OrdinalIgnoreCase);
+		public Object MainAsset => AssetDatabase.LoadMainAssetAtPath(this.UnityPath);
 
 		public FileStream OpenRead()
 		{
@@ -238,12 +240,17 @@ namespace AssetLock.Editor.Data
 
 		public override bool Equals(object obj)
 		{
-			return obj is FileReference other && this.AbsolutePath == other.AbsolutePath;
+			return obj is FileReference other && Equals(other);
 		}
 
 		public override int GetHashCode()
 		{
-			return this.AbsolutePath.GetHashCode();
+			return (AbsolutePath != null ? AbsolutePath.GetHashCode() : 0);
+		}
+
+		public bool Equals(FileReference other)
+		{
+			return AbsolutePath == other.AbsolutePath;
 		}
 	}
 }
