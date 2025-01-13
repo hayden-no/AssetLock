@@ -282,6 +282,7 @@ namespace AssetLock.Editor
 					{
 						UnityEngine.Debug.LogErrorFormat(GetMessage(format), args);
 					}
+
 					UnityEngine.Debug.LogErrorFormat(GetMessage(format), args);
 				}
 			}
@@ -597,26 +598,51 @@ namespace AssetLock.Editor
 
 		public static string GetFullPath(string path)
 		{
-			if (path.Contains(":"))
+			// if (path.Contains(":"))
+			// {
+			// 	// path is already a full path
+			// 	return path;
+			// }
+			//
+			// if (path.StartsWith(GitWorkingDirectory))
+			// {
+			// 	// remove the git working directory
+			// 	path = path.Replace(GitWorkingDirectory, string.Empty);
+			// 	// remove the leading slash
+			// 	path = path[1..];
+			// }
+			//
+			// var projectPath = Path.Combine(Application.dataPath, "..\\");
+			//
+			// if (path.StartsWith("Assets"))
+			// {
+			// 	// Assets length is 6 plus the leading slash
+			// 	path = path[7..];
+			// }
+			//
+			// return Path.Combine(Application.dataPath, path);
+
+			var info = new FileInfo(path);
+
+			if (info.Exists)
 			{
-				// path is already a full path
-				return path;
-			}
-			
-			if (path.StartsWith(GitWorkingDirectory))
-			{
-				// remove the git working directory
-				path = path.Replace(GitWorkingDirectory, string.Empty);
-				// remove the leading slash
-				path = path[1..];
+				return info.FullName;
 			}
 
-			if (path.StartsWith("Assets"))
+			string topDir;
+
+			do
 			{
-				// Assets length is 6 plus the leading slash
-				path = path[7..];
-			}
-			
+				topDir = Path.GetPathRoot(path);
+				var toSkip = topDir.Length + 1;
+				path = path[toSkip..];
+
+				if (topDir == "Assets")
+				{
+					break;
+				}
+			} while (topDir != null && topDir != string.Empty);
+
 			return Path.Combine(Application.dataPath, path);
 		}
 
