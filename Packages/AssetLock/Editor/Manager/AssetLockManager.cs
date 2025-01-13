@@ -3,14 +3,16 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using AssetLock.Editor.Data;
 using AssetLock.Editor.UI;
 using UnityEditor;
 using UnityEditor.SettingsManagement;
+using UnityEditor.VersionControl;
+using UnityEditorInternal;
 using UnityEngine;
 using static AssetLock.Editor.AssetLockUtility;
 using static AssetLock.Editor.AssetLockSettings;
+using Task = System.Threading.Tasks.Task;
 
 namespace AssetLock.Editor.Manager
 {
@@ -37,15 +39,17 @@ namespace AssetLock.Editor.Manager
 		internal DirectoryReference ProjectDir => m_projectDir;
 
 		private bool m_disposed;
-		
+
 		/// <summary>
 		/// The total number of files being tracked by Asset Lock.
 		/// </summary>
 		public int TrackedCount => m_lockRepo.Count;
+
 		/// <summary>
 		/// Total number of files currently locked in the repository.
 		/// </summary>
 		public int LockedCount => m_lockRepo.Locks.Count(l => l.locked);
+
 		/// <summary>
 		/// Total number of files currently locked by the current user.
 		/// </summary>
@@ -53,6 +57,7 @@ namespace AssetLock.Editor.Manager
 		/// The current user as determined by the Git configuration.
 		/// </remarks>
 		public int LockedByMeCount => m_lockRepo.Locks.Count(l => l is { locked: true, LockedByMe: true });
+
 		/// <summary>
 		/// Total number of files currently locked by other users.
 		/// </summary>
@@ -60,6 +65,7 @@ namespace AssetLock.Editor.Manager
 		/// The current user as determined by the Git configuration.
 		/// </remarks>
 		public int LockedByOthersCount => m_lockRepo.Locks.Count(l => l is { locked: true, LockedByMe: false });
+
 		/// <summary>
 		/// Total number of files that are not locked, but are being tracked.
 		/// </summary>
@@ -102,12 +108,12 @@ namespace AssetLock.Editor.Manager
 
 				return;
 			}
-			
+
 			if (!MasterEnable)
 			{
 				return;
 			}
-			
+
 			m_lockRepo = LockRepo.Deserialize(s_repoSerialized.value);
 
 			m_projectDir = DirectoryReference.FromPath(Path.GetFullPath(Application.dataPath));
@@ -121,7 +127,7 @@ namespace AssetLock.Editor.Manager
 
 			_ = InitGitLfs();
 		}
-		
+
 		~AssetLockManager()
 		{
 			if (!m_disposed)
@@ -134,19 +140,22 @@ namespace AssetLock.Editor.Manager
 		///<inheritdoc/>
 		public void Dispose()
 		{
-			s_repoSerialized.SetValue(m_lockRepo.Serialize(), true);
-			
+			if (m_lockRepo != null)
+			{
+				s_repoSerialized.SetValue(m_lockRepo?.Serialize(), true);
+			}
+
 			EditorApplication.projectWindowItemOnGUI -= ProjectWindowGUI.DrawOnProjectWindowGUI;
 			EditorApplication.update -= EditorLoop;
 			EditorApplication.quitting -= Dispose;
-			
+
 			m_disposed = true;
 		}
 
 		private void RunFirstTimeUserExperience()
 		{
 			IsFirstTimeExperience.SetValue(false);
-			
+
 			const string title = "Setting up AssetLock";
 			const string message = @"Before using AssetLock some settings must be configured.
 Please configure both the user Preferences and Project Settings for AssetLock.
@@ -154,7 +163,7 @@ Finally, reboot AssetLock to finish setup.  There is a button in the Lock Browse
 			const string confirm = "OK";
 
 			EditorUtility.DisplayDialog(title, message, confirm);
-			
+
 			Debug.Log($"[AssetLock] {message}");
 		}
 
@@ -183,13 +192,13 @@ Finally, reboot AssetLock to finish setup.  There is a button in the Lock Browse
 				{
 					Throw();
 				}
-				
+
 				int iter = 0;
 
 				while (iter < Constants.DEFAULT_LOCK_TIMEOUT)
 				{
 					await Task.Delay(Constants.DEFAULT_LOCK_TIMEOUT / 10);
-					iter+= Constants.DEFAULT_LOCK_TIMEOUT / 10;
+					iter += Constants.DEFAULT_LOCK_TIMEOUT / 10;
 				}
 
 				if (!m_lfsInitialized)
@@ -208,6 +217,7 @@ Finally, reboot AssetLock to finish setup.  There is a button in the Lock Browse
 		private void ParseDirectory(DirectoryReference dir, List<DirectoryReference> dirs)
 		{
 			dirs.Add(dir);
+
 			foreach (var file in dir.Files)
 			{
 				file.TrackFile();
