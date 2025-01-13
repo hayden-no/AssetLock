@@ -26,7 +26,8 @@ namespace AssetLock.Editor
 
 		public LockRepo(IEnumerable<LockInfo> locks)
 		{
-			m_locks = locks.Distinct().ToDictionary((l => (FileReference)l));
+			m_locks = new Dictionary<FileReference, LockInfo>();
+			Update(locks);
 		}
 
 		/// <summary>
@@ -129,18 +130,49 @@ namespace AssetLock.Editor
 		/// <param name="infos">All updated locks</param>
 		public void Update(IEnumerable<LockInfo> infos)
 		{
-			var locks = infos.Distinct().ToDictionary((l => (FileReference)l));
-			foreach (var value in m_locks.Values.ToList())
+			// var locks = infos.Distinct().ToDictionary((l => (FileReference)l));
+			// foreach (var value in m_locks.Values.ToList())
+			// {
+			// 	if (locks.TryGetValue(value, out var info))
+			// 	{
+			// 		m_locks[value] = info;
+			// 	}
+			// 	else
+			// 	{
+			// 		value.Reset();
+			// 		m_locks[value] = value;
+			// 	}
+			// }
+
+			HashSet<FileReference> visited = new();
+
+			foreach (var info in infos)
 			{
-				if (locks.TryGetValue(value, out var info))
+				if (!visited.Add(info))
 				{
-					m_locks[value] = info;
+					continue;
+				}
+
+				if (!m_locks.TryGetValue(info, out var value))
+				{
+					m_locks.Add((FileReference)info, info);
 				}
 				else
 				{
-					value.Reset();
-					m_locks[value] = value;
+					m_locks[value] = info;
 				}
+			}
+
+			for (int i = 0; i < m_locks.Count; i++)
+			{
+				var (key, value) = m_locks.ElementAt(i);
+				if (visited.Contains(key))
+				{
+					continue;
+				}
+
+				value.Reset();
+				m_locks[key] = value;
 			}
 		}
 
