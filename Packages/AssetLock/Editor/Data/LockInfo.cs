@@ -2,6 +2,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using AssetLock.Editor.Manager;
+using UnityEditor;
 
 namespace AssetLock.Editor.Data
 {
@@ -34,6 +35,34 @@ namespace AssetLock.Editor.Data
 			lockId = null;
 			owner = null;
 			lockedAt = null;
+		}
+
+		public bool TryUpdateGuid()
+		{
+			if (!string.IsNullOrWhiteSpace(guid))
+			{
+				// already has guid
+				return AssetDatabase.GUIDToAssetPath(guid) != null;
+			}
+			
+			FileReference reference = FileReference.FromPath(path);
+
+			if (!reference.Exists)
+			{
+				AssetLockUtility.Logging.LogVerboseFormat("File does not exist: {0}", path);
+			}
+			
+			var g = AssetDatabase.GUIDFromAssetPath(reference.UnityPath);
+
+			if (g.Empty())
+			{
+				AssetLockUtility.Logging.LogVerboseFormat("File does not have a guid: {0}", path);
+				return false;
+			}
+			
+			guid = g.ToString();
+			
+			return true;
 		}
 
 		public override string ToString()

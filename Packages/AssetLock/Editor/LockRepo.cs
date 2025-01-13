@@ -153,6 +153,11 @@ namespace AssetLock.Editor
 					continue;
 				}
 
+				if (!info.TryUpdateGuid())
+				{
+					continue;
+				}
+
 				if (!m_locks.TryGetValue(info, out var value))
 				{
 					m_locks.Add((FileReference)info, info);
