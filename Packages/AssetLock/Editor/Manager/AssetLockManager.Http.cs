@@ -130,7 +130,7 @@ namespace AssetLock.Editor.Manager
 
 			string GetPostData()
 			{
-				var data = new LockRequest { Path = file.GitPath, };
+				var data = new LockRequest { Path = file.AsProcessArg(), };
 
 				if (serverRef != null)
 				{
