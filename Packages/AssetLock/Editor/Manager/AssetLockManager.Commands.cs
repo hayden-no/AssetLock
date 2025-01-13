@@ -292,12 +292,12 @@ namespace AssetLock.Editor.Manager
 
 			if (UseHttp)
 			{
-				var response = await CreateLockHttp(reference);
+				var (success, info) = await CreateLockHttp(reference);
 
-				if (response.Item1)
+				if (success)
 				{
 					m_lockRepo.Remove(reference);
-					m_lockRepo[response.Item2] = response.Item2;
+					m_lockRepo[info] = info;
 				}
 			}
 			else
@@ -332,15 +332,14 @@ namespace AssetLock.Editor.Manager
 			{
 				if (m_lockRepo.TryGetValue(reference, out var info))
 				{
-					var response = await DeleteLockHttp(info, force);
+					var (success, lockInfo) = await DeleteLockHttp(info, force);
 
-					if (response.Item1)
+					if (success)
 					{
 						m_lockRepo.Remove(reference);
 						// we know it's no longer locked
-						var l = response.Item2;
-						l.locked = false;
-						m_lockRepo[l] = l;
+						lockInfo.locked = false;
+						m_lockRepo[lockInfo] = lockInfo;
 					}
 				}
 				else
@@ -373,16 +372,17 @@ namespace AssetLock.Editor.Manager
 			if (UseHttp)
 			{
 				var request = new ListLocksRequest() { Path = reference.GitPath };
-				var response = await ListLocksHttp(request);
+				var (success, _, locks) = await ListLocksHttp(request);
 
-				if (response.Item1)
+				if (success)
 				{
-					foreach (var info in response.Item3)
+					var arr = locks.ToArray();
+					foreach (var info in arr)
 					{
 						m_lockRepo[info] = info;
 					}
 
-					return response.Item3.Any();
+					return arr.Any();
 				}
 				else
 				{
@@ -431,11 +431,11 @@ namespace AssetLock.Editor.Manager
 
 			if (UseHttp)
 			{
-				var response = await ListLocksHttp(new());
+				var (success, _, locks) = await ListLocksHttp(new());
 
-				if (response.Item1)
+				if (success)
 				{
-					return response.Item3.ToList();
+					return locks.ToList();
 				}
 				else
 				{

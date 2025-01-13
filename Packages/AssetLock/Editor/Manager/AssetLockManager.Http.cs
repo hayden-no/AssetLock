@@ -64,7 +64,7 @@ namespace AssetLock.Editor.Manager
 			}
 		}
 
-		private async Task<(bool, LockInfo)> CreateLockHttp(FileReference file, string serverRef = null)
+		private async Task<(bool success, LockInfo info)> CreateLockHttp(FileReference file, string serverRef = null)
 		{
 			var request = UnityWebRequest.Post(GitLfsServerLocksApiUrl, GetPostData(), CONTENT_TYPE);
 			AppendHeaders(request);
@@ -141,7 +141,7 @@ namespace AssetLock.Editor.Manager
 			}
 		}
 
-		private async Task<(bool, string, IEnumerable<LockInfo>)> ListLocksHttp(ListLocksRequest requestData)
+		private async Task<(bool success, string nextCursor, IEnumerable<LockInfo> locks)> ListLocksHttp(ListLocksRequest requestData)
 		{
 			var request = UnityWebRequest.Get(requestData.ToURI(GitLfsServerLocksApiUrl));
 			AppendHeaders(request);
@@ -198,7 +198,7 @@ namespace AssetLock.Editor.Manager
 			return result;
 		}
 
-		private async Task<(bool, LockInfo)> DeleteLockHttp(LockInfo info, bool force = false, string refspec = null)
+		private async Task<(bool success, LockInfo info)> DeleteLockHttp(LockInfo info, bool force = false, string refspec = null)
 		{
 			var request = UnityWebRequest.Post(GetDeleteUrl(), GetPostData(), CONTENT_TYPE);
 			AppendHeaders(request);

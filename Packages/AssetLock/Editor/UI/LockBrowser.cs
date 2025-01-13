@@ -23,6 +23,8 @@ namespace AssetLock.Editor.UI
 
 		private string m_searchInput = string.Empty;
 		private bool m_force;
+		
+		private Vector2 m_scrollPos;
 
 		private Dictionary<DirectoryReference, bool> m_expanded = new();
 		private Dictionary<FileReference, bool> m_busy = new();
@@ -212,8 +214,10 @@ namespace AssetLock.Editor.UI
 
 			EditorGUI.indentLevel++;
 
+			m_scrollPos = BeginScrollView(m_scrollPos);
 			DisplayFolder(AssetLockManager.Instance.ProjectDir, m_searchInput);
-
+			EndScrollView();
+			
 			EditorGUI.indentLevel--;
 		}
 

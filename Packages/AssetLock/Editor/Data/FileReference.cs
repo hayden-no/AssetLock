@@ -77,7 +77,9 @@ namespace AssetLock.Editor.Data
 
 		public string AsProcessArg()
 		{
-			return $"\"{this.GitPath}\"";
+			var path = UnityPath;
+			path = path.Replace("\\", "/");
+			return $"\"{path}\"";
 		}
 
 		public void TrackFile(bool force = false)
