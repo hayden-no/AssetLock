@@ -79,7 +79,8 @@ namespace AssetLock.Editor.Data
 		{
 			var path = UnityPath;
 			path = path.Replace("\\", "/");
-			return $"\"{path}\"";
+
+			return path;
 		}
 
 		public void TrackFile(bool force = false)
