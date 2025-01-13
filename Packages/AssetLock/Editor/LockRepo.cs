@@ -26,7 +26,7 @@ namespace AssetLock.Editor
 
 		public LockRepo(IEnumerable<LockInfo> locks)
 		{
-			m_locks = new Dictionary<FileReference, LockInfo>();
+			m_locks = locks.Distinct().ToDictionary((l => (FileReference)l));
 		}
 
 		/// <summary>
@@ -129,7 +129,7 @@ namespace AssetLock.Editor
 		/// <param name="infos">All updated locks</param>
 		public void Update(IEnumerable<LockInfo> infos)
 		{
-			var locks = infos.ToDictionary((l => (FileReference)l));
+			var locks = infos.Distinct().ToDictionary((l => (FileReference)l));
 			foreach (var value in m_locks.Values.ToList())
 			{
 				if (locks.TryGetValue(value, out var info))

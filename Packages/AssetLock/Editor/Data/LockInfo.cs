@@ -9,7 +9,7 @@ namespace AssetLock.Editor.Data
 	/// Holds information about a file lock.
 	/// </summary>
 	[Serializable]
-	internal struct LockInfo
+	internal struct LockInfo : IEquatable<LockInfo>
 	{
 		public string guid;
 		public string path;
@@ -44,6 +44,21 @@ namespace AssetLock.Editor.Data
 			}
 
 			return locked ? $"{name} (id: {lockId}): locked by {owner} at {lockedAt}" : $"{name}: unlocked";
+		}
+
+		public bool Equals(LockInfo other)
+		{
+			return ((FileReference)this).Equals((FileReference)other);
+		}
+
+		public override bool Equals(object obj)
+		{
+			return obj is LockInfo other && Equals(other);
+		}
+
+		public override int GetHashCode()
+		{
+			return HashCode.Combine(guid, path, name, locked, lockId, owner, lockedAt);
 		}
 	}
 }
