@@ -122,9 +122,15 @@ namespace AssetLock.Editor.Manager
 				GitLfsServerLocksApiUrl.SetValue(url + "/locks");
 			}
 
+			bool gotDir = false;
 			if (TryGetLfsWorkingDirFromEnv(env.StdOut, out var dir))
 			{
 				GitWorkingDirectoryReference = DirectoryReference.FromPath(dir);
+				gotDir = true;
+			}
+			else
+			{
+				Logging.LogWarning("Failed to get working directory from Git LFS environment.");
 			}
 
 			Logging.LogFormat("Git LFS environment: {0}", env);
@@ -132,6 +138,12 @@ namespace AssetLock.Editor.Manager
 			if (string.IsNullOrWhiteSpace(GitWorkingDirectory))
 			{
 				GitWorkingDirectory.SetValue(await GetGitWorkingDirectory());
+
+				if (!gotDir)
+				{
+					GitWorkingDirectoryReference = DirectoryReference.FromPath(GitWorkingDirectory);
+					gotDir = true;
+				}
 			}
 
 			if (string.IsNullOrWhiteSpace(GitRemoteUrl))
@@ -140,6 +152,12 @@ namespace AssetLock.Editor.Manager
 				GitRemoteUrl.SetValue(gitRemote);
 				GitLfsServerUrl.SetValue(gitRemote + "/info/lfs");
 				GitLfsServerLocksApiUrl.SetValue(gitRemote + "/info/lfs/locks");
+			}
+			
+			if (!gotDir)
+			{
+				GitWorkingDirectoryReference = DirectoryReference.FromPath("failed");
+				Logging.LogError("Failed to get git working directory.");
 			}
 
 			if (ParseFilesOnStartup)

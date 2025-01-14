@@ -32,7 +32,15 @@ namespace AssetLock.Editor.Data
 				path = path[..^2]; // remove trailing slash
 			}
 
-			AbsolutePath = Path.GetFullPath(path);
+			if (path.Contains(":"))
+			{
+				// path is absolute
+				AbsolutePath = path;
+			}
+			else
+			{
+				AbsolutePath = Path.GetFullPath(path);
+			}
 		}
 
 		public string Name => AbsolutePath.Substring(AbsolutePath.LastIndexOf(Path.DirectorySeparatorChar) + 1);
@@ -55,7 +63,7 @@ namespace AssetLock.Editor.Data
 		{
 			return new DirectoryReference(path);
 		}
-		
+
 		public static DirectoryReference FromFile(FileReference file)
 		{
 			return new DirectoryReference(Path.GetDirectoryName(file.AbsolutePath));
@@ -137,7 +145,7 @@ namespace AssetLock.Editor.Data
 				}
 			}
 		}
-		
+
 		public IEnumerable<FileReference> EnumerateLockedChildFiles()
 		{
 			if (!Exists)
@@ -153,7 +161,7 @@ namespace AssetLock.Editor.Data
 				}
 			}
 		}
-		
+
 		public void TrackChildren(bool force = false)
 		{
 			foreach (var file in EnumerateChildFiles(false).Distinct())
@@ -164,22 +172,24 @@ namespace AssetLock.Editor.Data
 				}
 			}
 		}
-		
+
 		public async Task TrackChildrenAsync(bool force = false)
 		{
-			await Task.WhenAll(EnumerateChildFiles(false).Distinct().Where(f => f.ShouldTrack).Select(f => f.TrackFileAsync(force)));
+			await Task.WhenAll(
+				EnumerateChildFiles(false).Distinct().Where(f => f.ShouldTrack).Select(f => f.TrackFileAsync(force))
+			);
 		}
-		
+
 		public void TrackChildrenRecursively(bool force = false)
 		{
 			TrackChildren(force);
-			
+
 			foreach (var directory in EnumerateChildDirectories())
 			{
 				directory.TrackChildrenRecursively(force);
 			}
 		}
-		
+
 		public void UntrackChildren(bool force = false)
 		{
 			foreach (var file in EnumerateChildFiles(false).Distinct())
@@ -190,22 +200,24 @@ namespace AssetLock.Editor.Data
 				}
 			}
 		}
-		
+
 		public async Task UntrackChildrenAsync(bool force = false)
 		{
-			await Task.WhenAll(EnumerateChildFiles(false).Distinct().Where(f => f.Tracked).Select(f => f.UntrackFileAsync(force)));
+			await Task.WhenAll(
+				EnumerateChildFiles(false).Distinct().Where(f => f.Tracked).Select(f => f.UntrackFileAsync(force))
+			);
 		}
-		
+
 		public void UntrackChildrenRecursively(bool force = false)
 		{
 			UntrackChildren(force);
-			
+
 			foreach (var directory in EnumerateChildDirectories())
 			{
 				directory.UntrackChildrenRecursively(force);
 			}
 		}
-		
+
 		public void LockChildren(bool force = false)
 		{
 			foreach (var file in EnumerateTrackedChildFiles().Distinct())
@@ -216,22 +228,24 @@ namespace AssetLock.Editor.Data
 				}
 			}
 		}
-		
+
 		public async Task LockChildrenAsync(bool force = false)
 		{
-			await Task.WhenAll(EnumerateTrackedChildFiles().Distinct().Where(f => !f.Locked).Select(f => f.LockFileAsync(force)));
+			await Task.WhenAll(
+				EnumerateTrackedChildFiles().Distinct().Where(f => !f.Locked).Select(f => f.LockFileAsync(force))
+			);
 		}
-		
+
 		public void LockChildrenRecursively(bool force = false)
 		{
 			LockChildren(force);
-			
+
 			foreach (var directory in EnumerateChildDirectories())
 			{
 				directory.LockChildrenRecursively(force);
 			}
 		}
-		
+
 		public void UnlockChildren(bool force = false)
 		{
 			foreach (var file in EnumerateTrackedChildFiles().Distinct())
@@ -242,39 +256,41 @@ namespace AssetLock.Editor.Data
 				}
 			}
 		}
-		
+
 		public async Task UnlockChildrenAsync(bool force = false)
 		{
-			await Task.WhenAll(EnumerateTrackedChildFiles().Distinct().Where(f => f.Locked).Select(f => f.UnlockFileAsync(force)));
+			await Task.WhenAll(
+				EnumerateTrackedChildFiles().Distinct().Where(f => f.Locked).Select(f => f.UnlockFileAsync(force))
+			);
 		}
-		
+
 		public void UnlockChildrenRecursively(bool force = false)
 		{
 			UnlockChildren(force);
-			
+
 			foreach (var directory in EnumerateChildDirectories())
 			{
 				directory.UnlockChildrenRecursively(force);
 			}
 		}
-		
+
 		public void RefreshChildrenLocks()
 		{
 			// FIXME: for now just refresh all files
 			AssetLockManager.Instance.Refresh();
 		}
-		
+
 		public async Task RefreshChildrenLocksAsync()
 		{
 			// FIXME: for now just refresh all files
 			await AssetLockManager.Instance.RefreshAsync();
 		}
-		
+
 		public void RefreshChildrenLocksRecursively()
 		{
 			// FIXME: for now just refresh all files
 			AssetLockManager.Instance.Refresh();
-			
+
 			// RefreshChildrenLocks();
 			//
 			// foreach (var directory in EnumerateChildDirectories())
