@@ -653,6 +653,12 @@ namespace AssetLock.Editor
 			}
 
 			var instance = AssetLockManager.Instance;
+			
+			if (instance == null)
+			{
+				// FIXME: manager hasn't started yet
+				return path;
+			}
 
 			try
 			{
