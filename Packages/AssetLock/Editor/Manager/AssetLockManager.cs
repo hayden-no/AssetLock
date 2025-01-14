@@ -116,7 +116,9 @@ namespace AssetLock.Editor.Manager
 				return;
 			}
 
-			m_lockRepo = LockRepo.Deserialize(s_repoSerialized.value);
+			// FIXME: disable for now
+			// m_lockRepo = LockRepo.Deserialize(s_repoSerialized.value);
+			m_lockRepo = new LockRepo();
 
 			UnityDataDirectoryReference = DirectoryReference.FromPath(Path.GetFullPath(Application.dataPath));
 			UnityProjectDirectoryReference = UnityDataDirectoryReference.Parent;

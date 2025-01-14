@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using AssetLock.Editor.Data;
@@ -21,12 +22,12 @@ namespace AssetLock.Editor
 
 		public LockRepo()
 		{
-			m_locks = new Dictionary<FileReference, LockInfo>();
+			m_locks = new ConcurrentDictionary<FileReference, LockInfo>();
 		}
 
 		public LockRepo(IEnumerable<LockInfo> locks)
 		{
-			m_locks = new Dictionary<FileReference, LockInfo>();
+			m_locks = new ConcurrentDictionary<FileReference, LockInfo>();
 			Update(locks);
 		}
 
