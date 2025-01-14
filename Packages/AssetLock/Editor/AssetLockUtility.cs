@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using AssetLock.Editor.Data;
+using AssetLock.Editor.Manager;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
 using UnityEditor;
@@ -40,6 +41,7 @@ namespace AssetLock.Editor
 			public const string GIT_LFS_SERVER_LOCKS_API_EXT = "/locks";
 
 			public const string GIT_LFS_ENV_ENDPOINT = "Endpoint=";
+			public const string GIT_LFS_ENV_WORKING_DIR = "LocalWorkingDir=";
 
 			public static readonly string[] DEFAULT_TRACKED_EXTENSIONS = new[] { ".prefab", ".unity", ".asset" };
 			public const int DEFAULT_QUICK_CHECK_SIZE = 4096;
@@ -557,6 +559,28 @@ namespace AssetLock.Editor
 			return !string.IsNullOrWhiteSpace(endpointUrl);
 		}
 
+		public static bool TryGetLfsWorkingDirFromEnv(string env, out string workingDir)
+		{
+			workingDir = string.Empty;
+
+			int from = env.IndexOf(Constants.GIT_LFS_ENV_WORKING_DIR, StringComparison.OrdinalIgnoreCase);
+
+			if (from == -1)
+			{
+				return false;
+			}
+
+			int to1 = env.IndexOf(" ", from, StringComparison.OrdinalIgnoreCase);
+			int to2 = env.IndexOf("\n", from, StringComparison.OrdinalIgnoreCase);
+			int to = to1 == -1 ? to2 : to2 == -1 ? to1 : Math.Min(to1, to2);
+
+			from += Constants.GIT_LFS_ENV_WORKING_DIR.Length;
+
+			workingDir = env.Substring(from, to - from);
+
+			return !string.IsNullOrWhiteSpace(workingDir);
+		}
+
 		public static string NormalizePath(string path)
 		{
 			if (string.IsNullOrWhiteSpace(path))
@@ -622,24 +646,30 @@ namespace AssetLock.Editor
 			//
 			// return Path.Combine(Application.dataPath, path);
 
-			var info = new FileInfo(path);
-
-			if (info.Exists)
-			{
-				return info.FullName;
-			}
-
-			path = Path.GetFullPath(path);
-			
 			if (path.Contains(":"))
 			{
 				// path is already a full path
 				return path;
 			}
-			
-			path = Path.GetRelativePath(Application.dataPath, path);
 
-			return Path.Combine(Application.dataPath, path);
+			var instance = AssetLockManager.Instance;
+
+			if (path.StartsWith(instance.GitWorkingDirectoryReference.Name))
+			{
+				return Path.Combine(instance.GitWorkingDirectoryReference.Parent.AbsolutePath, path);
+			}
+			
+			if (path.StartsWith(instance.UnityProjectDirectoryReference.Name))
+			{
+				return Path.Combine(instance.UnityProjectDirectoryReference.Parent.AbsolutePath, path);
+			}
+
+			if (path.StartsWith(instance.UnityDataDirectoryReference.Name))
+			{
+				return Path.Combine(instance.UnityDataDirectoryReference.Parent.AbsolutePath, path);
+			}
+			
+			throw new ArgumentException("Could not determine the full path.");
 		}
 
 		public static string GetPathWithoutMeta(string path)

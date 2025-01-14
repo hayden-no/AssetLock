@@ -75,7 +75,7 @@ namespace AssetLock.Editor.Manager
 		{
 			ThrowIfNotInitialized();
 
-			var dir = m_projectDir;
+			var dir = UnityDataDirectoryReference;
 
 			if (!dir.Exists)
 			{

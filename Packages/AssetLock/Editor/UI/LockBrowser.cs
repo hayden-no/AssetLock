@@ -201,21 +201,21 @@ namespace AssetLock.Editor.UI
 
 				if (EditorGUI.EndChangeCheck() || !m_expanded.Any())
 				{
-					ParseDirectory(AssetLockManager.Instance.ProjectDir, m_searchInput, out _);
+					ParseDirectory(AssetLockManager.Instance.UnityDataDirectoryReference, m_searchInput, out _);
 				}
 
 				if (GUILayout.Button(refreshLabel, GUILayout.Width(30)))
 				{
 					m_busy.Clear();
 					m_dirBusy.Clear();
-					ParseDirectory(AssetLockManager.Instance.ProjectDir, m_searchInput, out _);
+					ParseDirectory(AssetLockManager.Instance.UnityDataDirectoryReference, m_searchInput, out _);
 				}
 			}
 
 			EditorGUI.indentLevel++;
 
 			m_scrollPos = BeginScrollView(m_scrollPos);
-			DisplayFolder(AssetLockManager.Instance.ProjectDir, m_searchInput);
+			DisplayFolder(AssetLockManager.Instance.UnityDataDirectoryReference, m_searchInput);
 			EndScrollView();
 			
 			EditorGUI.indentLevel--;

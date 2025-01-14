@@ -35,8 +35,10 @@ namespace AssetLock.Editor.Manager
 		private bool m_lfsInitialized;
 		private bool m_lfsFailed;
 
-		private DirectoryReference m_projectDir;
-		internal DirectoryReference ProjectDir => m_projectDir;
+		internal DirectoryReference UnityProjectDirectoryReference { get; }
+		// Assets directory
+		internal DirectoryReference UnityDataDirectoryReference { get; }
+		internal DirectoryReference GitWorkingDirectoryReference { get; private set; }
 
 		private bool m_disposed;
 
@@ -116,7 +118,8 @@ namespace AssetLock.Editor.Manager
 
 			m_lockRepo = LockRepo.Deserialize(s_repoSerialized.value);
 
-			m_projectDir = DirectoryReference.FromPath(Path.GetFullPath(Application.dataPath));
+			UnityDataDirectoryReference = DirectoryReference.FromPath(Path.GetFullPath(Application.dataPath));
+			UnityProjectDirectoryReference = UnityDataDirectoryReference.Parent;
 
 			m_gitProcess = new ProcessWrapper(GitPath);
 			m_lfsProcess = new ProcessWrapper(GitLfsPath);

@@ -122,6 +122,11 @@ namespace AssetLock.Editor.Manager
 				GitLfsServerLocksApiUrl.SetValue(url + "/locks");
 			}
 
+			if (TryGetLfsWorkingDirFromEnv(env.StdOut, out var dir))
+			{
+				GitWorkingDirectoryReference = DirectoryReference.FromPath(dir);
+			}
+
 			Logging.LogFormat("Git LFS environment: {0}", env);
 
 			if (string.IsNullOrWhiteSpace(GitWorkingDirectory))
