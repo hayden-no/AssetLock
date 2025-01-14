@@ -646,6 +646,8 @@ namespace AssetLock.Editor
 			//
 			// return Path.Combine(Application.dataPath, path);
 
+			path = Path.GetFullPath(path);
+
 			if (path.Contains(":"))
 			{
 				// path is already a full path
