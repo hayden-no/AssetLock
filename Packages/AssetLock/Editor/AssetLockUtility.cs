@@ -646,8 +646,6 @@ namespace AssetLock.Editor
 			//
 			// return Path.Combine(Application.dataPath, path);
 
-			path = Path.GetFullPath(path);
-
 			if (path.Contains(":"))
 			{
 				// path is already a full path
@@ -666,7 +664,8 @@ namespace AssetLock.Editor
 			{
 				if (path.StartsWith(instance.GitWorkingDirectoryReference.Name))
 				{
-					return Path.Combine(instance.GitWorkingDirectoryReference.Parent.AbsolutePath, path);
+					path = Path.Combine(instance.GitWorkingDirectoryReference.Parent.AbsolutePath, path);
+					return Path.GetFullPath(path);
 				}
 			}
 			catch
@@ -676,12 +675,14 @@ namespace AssetLock.Editor
 
 			if (path.StartsWith(instance.UnityProjectDirectoryReference.Name))
 			{
-				return Path.Combine(instance.UnityProjectDirectoryReference.Parent.AbsolutePath, path);
+				path = Path.Combine(instance.UnityProjectDirectoryReference.Parent.AbsolutePath, path);
+				return Path.GetFullPath(path);
 			}
 
 			if (path.StartsWith(instance.UnityDataDirectoryReference.Name))
 			{
-				return Path.Combine(instance.UnityDataDirectoryReference.Parent.AbsolutePath, path);
+				path = Path.Combine(instance.UnityDataDirectoryReference.Parent.AbsolutePath, path);
+				return Path.GetFullPath(path);
 			}
 			
 			Logging.LogErrorFormat("Could not determine the full path for {0}.\nUnityProj: {1}\nUnityData: {2}", path, instance.UnityProjectDirectoryReference, instance.UnityDataDirectoryReference);
