@@ -51,7 +51,7 @@ namespace AssetLock.Editor.UI
 
 		private void InfoGUI()
 		{
-			if (AssetLockManager.Instance is null)
+			if (AssetLockManager.Instance is null || !MasterEnable)
 			{
 				return;
 			}

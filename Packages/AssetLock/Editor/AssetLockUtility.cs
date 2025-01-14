@@ -654,11 +654,18 @@ namespace AssetLock.Editor
 
 			var instance = AssetLockManager.Instance;
 
-			if (path.StartsWith(instance.GitWorkingDirectoryReference.Name))
+			try
 			{
-				return Path.Combine(instance.GitWorkingDirectoryReference.Parent.AbsolutePath, path);
+				if (path.StartsWith(instance.GitWorkingDirectoryReference.Name))
+				{
+					return Path.Combine(instance.GitWorkingDirectoryReference.Parent.AbsolutePath, path);
+				}
 			}
-			
+			catch
+			{
+				// ignored
+			}
+
 			if (path.StartsWith(instance.UnityProjectDirectoryReference.Name))
 			{
 				return Path.Combine(instance.UnityProjectDirectoryReference.Parent.AbsolutePath, path);
@@ -668,7 +675,7 @@ namespace AssetLock.Editor
 			{
 				return Path.Combine(instance.UnityDataDirectoryReference.Parent.AbsolutePath, path);
 			}
-			
+
 			throw new ArgumentException("Could not determine the full path.");
 		}
 
