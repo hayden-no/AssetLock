@@ -32,15 +32,7 @@ namespace AssetLock.Editor.Data
 				path = path[..^2]; // remove trailing slash
 			}
 
-			if (path.Contains(":"))
-			{
-				// path is absolute
-				AbsolutePath = path;
-			}
-			else
-			{
-				AbsolutePath = Path.GetFullPath(path);
-			}
+			AbsolutePath = Path.GetFullPath(path);
 		}
 
 		public string Name => AbsolutePath.Substring(AbsolutePath.LastIndexOf(Path.DirectorySeparatorChar) + 1);

@@ -675,6 +675,8 @@ namespace AssetLock.Editor
 			{
 				return Path.Combine(instance.UnityDataDirectoryReference.Parent.AbsolutePath, path);
 			}
+			
+			Logging.LogErrorFormat("Could not determine the full path for {0}.\nUnityProj: {1}\nUnityData: {2}", path, instance.UnityProjectDirectoryReference, instance.UnityDataDirectoryReference);
 
 			throw new ArgumentException("Could not determine the full path.");
 		}
