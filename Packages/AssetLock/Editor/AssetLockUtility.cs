@@ -678,7 +678,7 @@ namespace AssetLock.Editor
 			
 			Logging.LogErrorFormat("Could not determine the full path for {0}.\nUnityProj: {1}\nUnityData: {2}", path, instance.UnityProjectDirectoryReference, instance.UnityDataDirectoryReference);
 
-			throw new ArgumentException("Could not determine the full path.");
+			return string.Empty;
 		}
 
 		public static string GetPathWithoutMeta(string path)
