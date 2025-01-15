@@ -194,10 +194,9 @@ namespace AssetLock.Editor.Manager
 		private async Task<string> GetGitUser()
 		{
 			const string cmd = "config";
-			const string arg1 = "--global";
-			const string arg2 = "user.name";
+			const string arg1 = "user.name";
 
-			var result = await m_gitProcess.RunCommandAsync(cmd, arg1, arg2);
+			var result = await m_gitProcess.RunCommandAsync(cmd, arg1);
 			ThrowOnProcessError(result, "failed to get git user");
 
 			return result.StdOut.Trim();

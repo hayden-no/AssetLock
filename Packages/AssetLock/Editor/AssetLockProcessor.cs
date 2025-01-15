@@ -152,7 +152,10 @@ namespace AssetLock.Editor
 				}
 			}
 
-			Logging.LogWarningFormat("Unsaved assets: {0}", string.Join(", ", unsaved));
+			if (unsaved.Any())
+			{
+				Logging.LogWarningFormat("Unsaved assets: {0}", string.Join(", ", unsaved));
+			}
 
 			return paths.Except(unsaved).ToArray();
 		}
@@ -180,7 +183,8 @@ namespace AssetLock.Editor
 			}
 			else if (info is { locked: true, LockedByMe: false })
 			{
-				LogReferenceWarningFormat(path,
+				LogReferenceWarningFormat(
+					path,
 					"Cannot delete locked asset {0} because it is locked by {1}.",
 					assetPath,
 					info.owner
@@ -219,7 +223,8 @@ namespace AssetLock.Editor
 			}
 			else if (info is { locked: true, LockedByMe: false })
 			{
-				LogReferenceWarningFormat(path,
+				LogReferenceWarningFormat(
+					path,
 					"Cannot move locked asset {0} because it is locked by {1}.",
 					sourcePath,
 					info.owner
@@ -256,7 +261,7 @@ namespace AssetLock.Editor
 				{
 					path.TrackFile();
 				}
-				
+
 				LogReferenceVerboseFormat(path, "File mode changed for {0} to {1}", path, mode);
 			}
 		}
@@ -310,7 +315,11 @@ namespace AssetLock.Editor
 					reference.LockFileAsync().Wait(Constants.DEFAULT_LOCK_TIMEOUT);
 				}
 
-				LogReferenceFormat(reference, "Automatically locked asset {0} because it is binary.", reference.UnityPath);
+				LogReferenceFormat(
+					reference,
+					"Automatically locked asset {0} because it is binary.",
+					reference.UnityPath
+				);
 
 				return true;
 			}
@@ -362,7 +371,7 @@ namespace AssetLock.Editor
 				Logging.LogFormat(format, args);
 			}
 		}
-		
+
 		[StringFormatMethod("format")]
 		private static void LogReferenceVerboseFormat(FileReference reference, string format, params object[] args)
 		{
