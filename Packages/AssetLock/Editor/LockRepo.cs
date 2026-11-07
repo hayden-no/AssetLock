@@ -20,10 +20,7 @@ namespace AssetLock.Editor
 		/// </summary>
 		public IEnumerable<LockInfo> Locks => m_locks.Values;
 
-		public LockRepo()
-		{
-			m_locks = new ConcurrentDictionary<FileReference, LockInfo>();
-		}
+		public LockRepo() => m_locks = new ConcurrentDictionary<FileReference, LockInfo>();
 
 		public LockRepo(IEnumerable<LockInfo> locks)
 		{
@@ -55,69 +52,42 @@ namespace AssetLock.Editor
 		/// <returns>json string</returns>
 		public string Serialize()
 		{
-			string results = JsonConvert.SerializeObject(Locks.ToArray());
-			AssetLockUtility.Logging.LogVerboseFormat("Lock Repo Serialized {0} locks\nResults:\n\t{1}", Locks.Count(), results);
+			var results = JsonConvert.SerializeObject(Locks.ToArray());
+			AssetLockUtility.Logging.LogVerboseFormat(
+				"Lock Repo Serialized {0} locks\nResults:\n\t{1}",
+				Locks.Count(),
+				results
+			);
+
 			return results;
 		}
 
-		public IEnumerator<KeyValuePair<FileReference, LockInfo>> GetEnumerator()
-		{
-			return m_locks.GetEnumerator();
-		}
+		public IEnumerator<KeyValuePair<FileReference, LockInfo>> GetEnumerator() => m_locks.GetEnumerator();
 
-		IEnumerator IEnumerable.GetEnumerator()
-		{
-			return ((IEnumerable)m_locks).GetEnumerator();
-		}
-		
-		public void Add(KeyValuePair<FileReference, LockInfo> item)
-		{
-			m_locks.Add(item);
-		}
-		
-		public void Clear()
-		{
-			m_locks.Clear();
-		}
-		
-		public bool Contains(KeyValuePair<FileReference, LockInfo> item)
-		{
-			return m_locks.Contains(item);
-		}
-		
-		public void CopyTo(KeyValuePair<FileReference, LockInfo>[] array, int arrayIndex)
-		{
+		IEnumerator IEnumerable.GetEnumerator() => ((IEnumerable)m_locks).GetEnumerator();
+
+		public void Add(KeyValuePair<FileReference, LockInfo> item) => m_locks.Add(item);
+
+		public void Clear() => m_locks.Clear();
+
+		public bool Contains(KeyValuePair<FileReference, LockInfo> item) => m_locks.Contains(item);
+
+		public void CopyTo(KeyValuePair<FileReference, LockInfo>[] array, int arrayIndex) =>
 			m_locks.CopyTo(array, arrayIndex);
-		}
-		
-		public bool Remove(KeyValuePair<FileReference, LockInfo> item)
-		{
-			return m_locks.Remove(item);
-		}
+
+		public bool Remove(KeyValuePair<FileReference, LockInfo> item) => m_locks.Remove(item);
 
 		public int Count => m_locks.Count;
-		
+
 		public bool IsReadOnly => m_locks.IsReadOnly;
 
-		public void Add(FileReference key, LockInfo value)
-		{
-			m_locks.Add(key, value);
-		}
+		public void Add(FileReference key, LockInfo value) => m_locks.Add(key, value);
 
-		public bool ContainsKey(FileReference key)
-		{
-			return m_locks.ContainsKey(key);
-		}
+		public bool ContainsKey(FileReference key) => m_locks.ContainsKey(key);
 
-		public bool Remove(FileReference key)
-		{
-			return m_locks.Remove(key);
-		}
+		public bool Remove(FileReference key) => m_locks.Remove(key);
 
-		public bool TryGetValue(FileReference key, out LockInfo value)
-		{
-			return m_locks.TryGetValue(key, out value);
-		}
+		public bool TryGetValue(FileReference key, out LockInfo value) => m_locks.TryGetValue(key, out value);
 
 		public LockInfo this[FileReference key]
 		{
@@ -149,33 +119,21 @@ namespace AssetLock.Editor
 
 			foreach (var info in infos)
 			{
-				if (!visited.Add(info))
-				{
-					continue;
-				}
+				if (!visited.Add(info)) continue;
 
-				if (!info.TryUpdateGuid())
-				{
-					continue;
-				}
+				if (!info.TryUpdateGuid()) continue;
 
 				if (!m_locks.TryGetValue(info, out var value))
-				{
 					m_locks.Add((FileReference)info, info);
-				}
 				else
-				{
 					m_locks[value] = info;
-				}
 			}
 
-			for (int i = 0; i < m_locks.Count; i++)
+			for (var i = 0; i < m_locks.Count; i++)
 			{
 				var (key, value) = m_locks.ElementAt(i);
-				if (visited.Contains(key))
-				{
-					continue;
-				}
+
+				if (visited.Contains(key)) continue;
 
 				value.Reset();
 				m_locks[key] = value;

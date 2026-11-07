@@ -16,6 +16,7 @@ namespace AssetLock.Editor.Manager
 		internal readonly long StatusCode;
 		internal readonly string Body;
 		internal readonly string Error;
+
 		internal HttpResult(long statusCode, string body, string error = null)
 		{
 			StatusCode = statusCode;
@@ -26,32 +27,34 @@ namespace AssetLock.Editor.Manager
 
 	public partial class AssetLockManager
 	{
-		const long HTTP_OK = 200;
-		const long HTTP_CREATED = 201;
-		const long HTTP_FORBIDDEN = 403;
-		const long HTTP_NOT_FOUND = 404;
-		const long HTTP_CONFILCT = 409;
-		const long HTTP_ERROR = 500;
+		private const long HTTP_OK = 200;
+		private const long HTTP_CREATED = 201;
+		private const long HTTP_FORBIDDEN = 403;
+		private const long HTTP_NOT_FOUND = 404;
+		private const long HTTP_CONFILCT = 409;
+		private const long HTTP_ERROR = 500;
 
-		const string CONTENT_TYPE = "application/vnd.git-lfs+json";
+		private const string CONTENT_TYPE = "application/vnd.git-lfs+json";
 
 		internal Func<UnityWebRequest, Task<HttpResult>> HttpTransport { get; set; }
 
 		private async Task<HttpResult> SendAsync(UnityWebRequest request)
 		{
 			request.timeout = 30;
+
 			if (UseGitCredentialHelper)
 			{
 				var identity = CredentialIdentities.Current;
 				var scope = GitCredentialClient.ScopeFor(request.url, identity);
 				var credential = await GitCredentialClient.GetForRequestAsync(scope, identity);
-				request.SetRequestHeader("Authorization", $"Basic {BasicAuthHeader(credential.Username, credential.Password)}");
+				request.SetRequestHeader(
+					"Authorization",
+					$"Basic {BasicAuthHeader(credential.Username, credential.Password)}"
+				);
 				request.redirectLimit = 0;
 			}
-			if (HttpTransport != null)
-			{
-				return await HttpTransport(request);
-			}
+
+			if (HttpTransport != null) return await HttpTransport(request);
 
 			var operation = request.SendWebRequest();
 
@@ -62,15 +65,12 @@ namespace AssetLock.Editor.Manager
 
 			return new HttpResult(request.responseCode, request.downloadHandler?.text, request.error);
 		}
-		
-		private string BearAuthHeader(string token)
-		{
-			return $"Bearer {token}";
-		}
-		
+
+		private string BearAuthHeader(string token) => $"Bearer {token}";
+
 		private string BasicAuthHeader(string username, string password)
 		{
-			byte[] bytes = Encoding.UTF8.GetBytes($"{username}:{password}");
+			var bytes = Encoding.UTF8.GetBytes($"{username}:{password}");
 
 			return Convert.ToBase64String(bytes);
 		}
@@ -78,20 +78,21 @@ namespace AssetLock.Editor.Manager
 		internal void AppendHeaders(UnityWebRequest request)
 		{
 			request.SetRequestHeader("Accept", CONTENT_TYPE);
+
 			if (UseGitCredentialHelper) return;
 
 			if (CredentialsType.value == CredentialsKind.GitHub)
-			{
 				request.SetRequestHeader("Authorization", BearAuthHeader(GitHubRemoteAuthToken));
-			}
 			else if (CredentialsType.value == CredentialsKind.GitLab)
-			{
-				request.SetRequestHeader("Authorization", $"Basic {BasicAuthHeader(GitLabRemoteUsername, GitLabRemoteAuthToken)}");
-			}
+				request.SetRequestHeader(
+					"Authorization",
+					$"Basic {BasicAuthHeader(GitLabRemoteUsername, GitLabRemoteAuthToken)}"
+				);
 			else
-			{
-				request.SetRequestHeader("Authorization", $"Basic {BasicAuthHeader(CredentialsUsername, CredentialsPassword)}");
-			}
+				request.SetRequestHeader(
+					"Authorization",
+					$"Basic {BasicAuthHeader(CredentialsUsername, CredentialsPassword)}"
+				);
 		}
 
 		internal async Task<(bool success, LockInfo info)> CreateLockHttp(FileReference file, string serverRef = null)
@@ -99,10 +100,7 @@ namespace AssetLock.Editor.Manager
 			using var request = UnityWebRequest.Post(GitLfsServerLocksApiUrl, GetPostData(), CONTENT_TYPE);
 			AppendHeaders(request);
 
-			if (LogHttp)
-			{
-				Logging.LogVerboseFormat("[HTTP] Sending lock request: {0}", GetWebRequestLogMessage(request));
-			}
+			if (LogHttp) Logging.LogVerboseFormat("[HTTP] Sending lock request: {0}", GetWebRequestLogMessage(request));
 
 			request.downloadHandler = new DownloadHandlerBuffer();
 			var webResult = await SendAsync(request);
@@ -114,7 +112,7 @@ namespace AssetLock.Editor.Manager
 				{
 					try
 					{
-						LockSuccessResponse response = JsonConvert.DeserializeObject<LockSuccessResponse>(webResult.Body);
+						var response = JsonConvert.DeserializeObject<LockSuccessResponse>(webResult.Body);
 						result = (true, response.Lock);
 					}
 					catch (JsonException)
@@ -126,24 +124,21 @@ namespace AssetLock.Editor.Manager
 				}
 				case HTTP_CONFILCT:
 				{
-					LockExistsResponse response =
-						JsonConvert.DeserializeObject<LockExistsResponse>(webResult.Body);
+					var response = JsonConvert.DeserializeObject<LockExistsResponse>(webResult.Body);
 					Logging.LogErrorFormat("[HTTP] Failed to lock file {0}: {1}", file.UnityPath, response);
 
 					goto finalize;
 				}
 				case HTTP_FORBIDDEN:
 				{
-					LockUnauthorizedResponse response =
-						JsonConvert.DeserializeObject<LockUnauthorizedResponse>(webResult.Body);
+					var response = JsonConvert.DeserializeObject<LockUnauthorizedResponse>(webResult.Body);
 					Logging.LogErrorFormat("[HTTP] Failed to lock file {0}: {1}", file.UnityPath, response);
 
 					goto finalize;
 				}
 				case HTTP_ERROR:
 				{
-					LockErrorResponse response =
-						JsonConvert.DeserializeObject<LockErrorResponse>(webResult.Body);
+					var response = JsonConvert.DeserializeObject<LockErrorResponse>(webResult.Body);
 					Logging.LogErrorFormat("[HTTP] Failed to lock file {0}: {1}", file.UnityPath, response);
 
 					goto finalize;
@@ -155,35 +150,28 @@ namespace AssetLock.Editor.Manager
 
 		finalize:
 
-			if (LogHttp)
-			{
-				Logging.LogVerboseFormat("[HTTP] Received response: {0}", GetResponseLogMessage(webResult));
-			}
+			if (LogHttp) Logging.LogVerboseFormat("[HTTP] Received response: {0}", GetResponseLogMessage(webResult));
 
 			return result;
 
 			string GetPostData()
 			{
-				var data = new LockRequest { Path = file.AsProcessArg(), };
+				var data = new LockRequest { Path = file.AsProcessArg() };
 
-				if (serverRef != null)
-				{
-					data.Ref = new GitLfsRefObject { Name = serverRef };
-				}
+				if (serverRef != null) data.Ref = new GitLfsRefObject { Name = serverRef };
 
 				return JsonConvert.SerializeObject(data);
 			}
 		}
 
-		internal async Task<(bool success, string nextCursor, IEnumerable<LockInfo> locks)> ListLocksHttp(ListLocksRequest requestData)
+		internal async Task<(bool success, string nextCursor, IEnumerable<LockInfo> locks)> ListLocksHttp(
+			ListLocksRequest requestData
+		)
 		{
 			using var request = UnityWebRequest.Get(requestData.ToURI(GitLfsServerLocksApiUrl));
 			AppendHeaders(request);
 
-			if (LogHttp)
-			{
-				Logging.LogVerboseFormat("[HTTP] Sending list request: {0}", GetWebRequestLogMessage(request));
-			}
+			if (LogHttp) Logging.LogVerboseFormat("[HTTP] Sending list request: {0}", GetWebRequestLogMessage(request));
 
 			request.downloadHandler = new DownloadHandlerBuffer();
 			var webResult = await SendAsync(request);
@@ -195,8 +183,10 @@ namespace AssetLock.Editor.Manager
 				{
 					try
 					{
-						ListLocksSuccessResponse response = JsonConvert.DeserializeObject<ListLocksSuccessResponse>(webResult.Body);
+						var response = JsonConvert.DeserializeObject<ListLocksSuccessResponse>(webResult.Body);
+
 						if (response.Locks == null) throw new JsonSerializationException("Missing locks.");
+
 						result = (true, response.NextCursor, response.Locks.Select(l => (LockInfo)l).ToArray());
 					}
 					catch (JsonException)
@@ -208,16 +198,14 @@ namespace AssetLock.Editor.Manager
 				}
 				case HTTP_FORBIDDEN:
 				{
-					LockUnauthorizedResponse response =
-						JsonConvert.DeserializeObject<LockUnauthorizedResponse>(webResult.Body);
+					var response = JsonConvert.DeserializeObject<LockUnauthorizedResponse>(webResult.Body);
 					Logging.LogErrorFormat("[HTTP] Failed to list locks: {0}", response);
 
 					goto finalize;
 				}
 				case HTTP_ERROR:
 				{
-					LockErrorResponse response =
-						JsonConvert.DeserializeObject<LockErrorResponse>(webResult.Body);
+					var response = JsonConvert.DeserializeObject<LockErrorResponse>(webResult.Body);
 					Logging.LogErrorFormat("[HTTP] Failed to list locks: {0}", response);
 
 					goto finalize;
@@ -229,23 +217,22 @@ namespace AssetLock.Editor.Manager
 
 		finalize:
 
-			if (LogHttp)
-			{
-				Logging.LogVerboseFormat("[HTTP] Received response: {0}", GetResponseLogMessage(webResult));
-			}
+			if (LogHttp) Logging.LogVerboseFormat("[HTTP] Received response: {0}", GetResponseLogMessage(webResult));
 
 			return result;
 		}
 
-		internal async Task<(bool success, LockInfo info)> DeleteLockHttp(LockInfo info, bool force = false, string refspec = null)
+		internal async Task<(bool success, LockInfo info)> DeleteLockHttp(
+			LockInfo info,
+			bool force = false,
+			string refspec = null
+		)
 		{
 			using var request = UnityWebRequest.Post(GetDeleteUrl(), GetPostData(), CONTENT_TYPE);
 			AppendHeaders(request);
 
 			if (LogHttp)
-			{
 				Logging.LogVerboseFormat("[HTTP] Sending unlock request: {0}", GetWebRequestLogMessage(request));
-			}
 
 			request.downloadHandler = new DownloadHandlerBuffer();
 			var webResult = await SendAsync(request);
@@ -269,16 +256,14 @@ namespace AssetLock.Editor.Manager
 				}
 				case HTTP_FORBIDDEN:
 				{
-					LockUnauthorizedResponse response =
-						JsonConvert.DeserializeObject<LockUnauthorizedResponse>(webResult.Body);
+					var response = JsonConvert.DeserializeObject<LockUnauthorizedResponse>(webResult.Body);
 					Logging.LogErrorFormat("[HTTP] Failed to unlock file {0}: {1}", info.path, response);
 
 					goto finalize;
 				}
 				case HTTP_ERROR:
 				{
-					LockErrorResponse response =
-						JsonConvert.DeserializeObject<LockErrorResponse>(webResult.Body);
+					var response = JsonConvert.DeserializeObject<LockErrorResponse>(webResult.Body);
 					Logging.LogErrorFormat("[HTTP] Failed to unlock file {0}: {1}", info.path, response);
 
 					goto finalize;
@@ -290,10 +275,7 @@ namespace AssetLock.Editor.Manager
 
 		finalize:
 
-			if (LogHttp)
-			{
-				Logging.LogVerboseFormat("[HTTP] Received response: {0}", GetResponseLogMessage(webResult));
-			}
+			if (LogHttp) Logging.LogVerboseFormat("[HTTP] Received response: {0}", GetResponseLogMessage(webResult));
 
 			return result;
 
@@ -301,12 +283,9 @@ namespace AssetLock.Editor.Manager
 
 			string GetPostData()
 			{
-				var data = new DeleteLockRequest { Force = force, };
+				var data = new DeleteLockRequest { Force = force };
 
-				if (refspec != null)
-				{
-					data.Ref = new GitLfsRefObject { Name = refspec };
-				}
+				if (refspec != null) data.Ref = new GitLfsRefObject { Name = refspec };
 
 				return JsonConvert.SerializeObject(data);
 			}
@@ -317,19 +296,13 @@ namespace AssetLock.Editor.Manager
 			using var request = UnityWebRequest.Get(GitLfsServerLocksApiUrl);
 			AppendHeaders(request);
 
-			if (LogHttp)
-			{
-				Logging.LogVerboseFormat("[HTTP] Sending test request: {0}", GetWebRequestLogMessage(request));
-			}
+			if (LogHttp) Logging.LogVerboseFormat("[HTTP] Sending test request: {0}", GetWebRequestLogMessage(request));
 
 			var webResult = await SendAsync(request);
 			var result = webResult.StatusCode == HTTP_OK;
 			var err = result ? string.Empty : webResult.Error;
 
-			if (LogHttp)
-			{
-				Logging.LogVerboseFormat("[HTTP] Received response: {0}", GetResponseLogMessage(webResult));
-			}
+			if (LogHttp) Logging.LogVerboseFormat("[HTTP] Received response: {0}", GetResponseLogMessage(webResult));
 
 			return (result, err);
 		}
@@ -356,15 +329,9 @@ namespace AssetLock.Editor.Manager
 
 			sb.AppendLine("Response:");
 
-			if (request.responseCode != 0)
-			{
-				sb.AppendLine($"\tCode: {request.responseCode}");
-			}
+			if (request.responseCode != 0) sb.AppendLine($"\tCode: {request.responseCode}");
 
-			if (!string.IsNullOrWhiteSpace(request.error))
-			{
-				sb.AppendLine("\tError: [details omitted]");
-			}
+			if (!string.IsNullOrWhiteSpace(request.error)) sb.AppendLine("\tError: [details omitted]");
 
 			return sb.ToString();
 		}

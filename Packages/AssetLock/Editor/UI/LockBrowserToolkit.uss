@@ -91,7 +91,7 @@
     -unity-font-style: bold;
 }
 
-.username{
+.username {
     font-size: 13px;
     margin-top: 5px;
     -unity-font-style: bold;

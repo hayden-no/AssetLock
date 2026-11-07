@@ -105,7 +105,7 @@ namespace AssetLock.Editor.UI
 			m_counts = new Label();
 			m_counts.AddToClassList("counts");
 			summaryValuesContainer.Add(m_counts);
-			summaryValuesContainer.Add(new VisualElement() { style = { flexGrow = 1 } });
+			summaryValuesContainer.Add(new VisualElement { style = { flexGrow = 1 } });
 			m_username = new Label();
 			m_username.AddToClassList("username");
 			summaryValuesContainer.Add(m_username);
@@ -122,9 +122,14 @@ namespace AssetLock.Editor.UI
 			m_lockActions.Add(ActionButton("Unlock mine", () => RunSync(() => AssetLockManager.Instance.UnlockAll())));
 			m_lockActions.Add(ActionButton("Lock selected", () => RunSelected(true)));
 			m_lockActions.Add(ActionButton("Unlock selected", () => RunSelected(false)));
-			foreach (var button in m_lockActions) m_actions.Add(button);
+
+			foreach (var button in m_lockActions)
+			{
+				m_actions.Add(button);
+			}
+
 			actionRow.Add(m_actions);
-			actionRow.Add(new VisualElement() { style = { width = 10 } });
+			actionRow.Add(new VisualElement { style = { width = 10 } });
 			m_generalActions = new VisualElement();
 			m_generalActions.AddToClassList("action-row");
 			m_reboot = ActionButton("Reboot", () => RunSync(AssetLockManager.Reboot));
@@ -143,9 +148,9 @@ namespace AssetLock.Editor.UI
 			m_filter = new ToolbarMenu { text = "All", name = "status-filter" };
 			m_filter.style.width = 95;
 
-			foreach (string value in new[] { "All", "Mine", "Others", "Unlocked" })
+			foreach (var value in new[] { "All", "Mine", "Others", "Unlocked" })
 			{
-				string selected = value;
+				var selected = value;
 				m_filter.menu.AppendAction(
 					selected,
 					_ =>
@@ -298,13 +303,13 @@ namespace AssetLock.Editor.UI
 		{
 			if (!(element.userData is Row row)) return;
 
-			bool force = m_force.value;
+			var force = m_force.value;
 			RunAsync(() => lockFile ? row.File.LockFileAsync(force) : row.File.UnlockFileAsync(force));
 		}
 
 		private void RunSelected(bool lockFiles)
 		{
-			bool force = m_force.value;
+			var force = m_force.value;
 			var selected = m_list.selectedIndices.Where(i => i >= 0 && i < m_rows.Count)
 				.Select(i => m_rows[i])
 				.ToArray();
@@ -371,22 +376,22 @@ namespace AssetLock.Editor.UI
 			if (m_list == null) return;
 
 			var manager = AssetLockManager.Instance;
-			bool ready = MasterEnable && manager?.IsReady == true;
-			bool paused = ready && manager.AutomaticRefreshPaused;
-			bool loading = ready && !paused && (manager.HasPendingCommands || manager.IsRefreshPending);
+			var ready = MasterEnable && manager?.IsReady == true;
+			var paused = ready && manager.AutomaticRefreshPaused;
+			var loading = ready && !paused && (manager.HasPendingCommands || manager.IsRefreshPending);
 			var entries = ready ? manager.Repo.ToArray() : Array.Empty<KeyValuePair<FileReference, LockInfo>>();
-			int revision = ready ? (paused ? 19 : loading ? 23 : 17) : manager?.IsInitializing == true ? 29 : 0;
+			var revision = ready ? paused ? 19 : loading ? 23 : 17 : manager?.IsInitializing == true ? 29 : 0;
 			UpdateStatus();
 
 			unchecked
 			{
 				foreach (var entry in entries.OrderBy(e => e.Key.AbsolutePath, StringComparer.OrdinalIgnoreCase))
 				{
-					revision = revision * 31 + entry.Key.GetHashCode();
-					revision = revision * 31 + (entry.Value.locked ? 1 : 0);
-					revision = revision * 31 + (entry.Value.owner?.GetHashCode() ?? 0);
-					revision = revision * 31 + (entry.Value.lockId?.GetHashCode() ?? 0);
-					revision = revision * 31 + (entry.Value.lockedAt?.GetHashCode() ?? 0);
+					revision = (revision * 31) + entry.Key.GetHashCode();
+					revision = (revision * 31) + (entry.Value.locked ? 1 : 0);
+					revision = (revision * 31) + (entry.Value.owner?.GetHashCode() ?? 0);
+					revision = (revision * 31) + (entry.Value.lockId?.GetHashCode() ?? 0);
+					revision = (revision * 31) + (entry.Value.lockedAt?.GetHashCode() ?? 0);
 				}
 			}
 
@@ -402,7 +407,12 @@ namespace AssetLock.Editor.UI
 			m_autoLock.SetValueWithoutNotify(AutoLock);
 			m_warnOnly.SetValueWithoutNotify(WarnOnly);
 			m_actions.SetEnabled(ready && !m_busy);
-			foreach (var button in m_lockActions) button.SetEnabled(!paused);
+
+			foreach (var button in m_lockActions)
+			{
+				button.SetEnabled(!paused);
+			}
+
 			m_reboot.SetEnabled(!m_busy);
 			m_enabled.SetEnabled(!m_busy);
 			const string pausedMessage =
@@ -410,21 +420,21 @@ namespace AssetLock.Editor.UI
 			if (paused)
 				m_message.text = pausedMessage;
 			else if (m_message.text == pausedMessage) m_message.text = string.Empty;
-			int mine = entries.Count(e => e.Value.LockedByMe);
-			int others = entries.Count(e => e.Value.locked && !e.Value.LockedByMe);
+			var mine = entries.Count(e => e.Value.LockedByMe);
+			var others = entries.Count(e => e.Value.locked && !e.Value.LockedByMe);
 			m_counts.text =
 				$"{entries.Length} tracked     ·     {mine} yours     ·     {others} others     ·     {entries.Length - mine - others} unlocked";
 			m_username.text = AssetLockManager.Instance.User;
-			string search = m_search.value?.Trim() ?? string.Empty;
+			var search = m_search.value?.Trim() ?? string.Empty;
 			m_rows.Clear();
 
 			foreach (var entry in entries.OrderBy(e => e.Key.UnityPath, StringComparer.OrdinalIgnoreCase))
 			{
 				var info = entry.Value;
 
-				if (m_filterValue == "Mine" && !info.LockedByMe ||
-					m_filterValue == "Others" && (!info.locked || info.LockedByMe) ||
-					m_filterValue == "Unlocked" && info.locked)
+				if ((m_filterValue == "Mine" && !info.LockedByMe) ||
+					(m_filterValue == "Others" && (!info.locked || info.LockedByMe)) ||
+					(m_filterValue == "Unlocked" && info.locked))
 					continue;
 				if (search.Length > 0 &&
 					!ALGUI.MatchesBrowserSearch(entry.Key.NameWithExtension, search) &&
@@ -449,9 +459,9 @@ namespace AssetLock.Editor.UI
 						:
 						entries.Length == 0
 							?
-							(loading
+							loading
 								? "Loading tracked assets and lock status..."
-								: "No tracked assets yet. Scan assets to get started.")
+								: "No tracked assets yet. Scan assets to get started."
 							: "No assets match your search or filter.";
 		}
 
@@ -460,7 +470,7 @@ namespace AssetLock.Editor.UI
 			if (m_status == null) return;
 
 			var manager = AssetLockManager.Instance;
-			string status = !MasterEnable ? "Disabled" :
+			var status = !MasterEnable ? "Disabled" :
 				manager?.IsInitializing == true ? "Initializing" :
 				manager?.IsReady != true ? "Setup required" :
 				manager.AutomaticRefreshPaused ? "Refresh paused" :

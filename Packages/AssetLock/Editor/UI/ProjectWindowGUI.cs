@@ -22,74 +22,52 @@ namespace AssetLock.Editor.UI
 				Event.current.type != EventType.Repaint ||
 				!MasterEnable ||
 				string.IsNullOrWhiteSpace(guid))
-			{
 				return;
-			}
 
 			var reference = FileReference.FromGuid(guid);
 
-			if (!reference.TryGetLock(out var lockInfo))
-			{
-				return;
-			}
+			if (!reference.TryGetLock(out var lockInfo)) return;
 
 			if (IsListView(selectionRect) && !IsListSubItem(selectionRect))
-			{
 				DrawListView(selectionRect, lockInfo);
-			}
-			else if (!IsListView(selectionRect))
-			{
-				DrawIconView(selectionRect, lockInfo);
-			}
+			else if (!IsListView(selectionRect)) DrawIconView(selectionRect, lockInfo);
 		}
 
 		private static void DrawIconView(Rect selectionRect, LockInfo lockInfo)
 		{
-			if (!lockInfo.HasValue)
-			{
-				return;
-			}
+			if (!lockInfo.HasValue) return;
 
-			GUIContent icon = lockInfo.locked ? s_lockIcon : s_unlockIcon;
-			float min = Mathf.Min(selectionRect.width, selectionRect.height);
-			Vector2 iconSize = new Vector2(min / 2, min / 2);
-			Rect iconRect = new Rect(selectionRect.x, selectionRect.y, iconSize.x, iconSize.y);
+			var icon = lockInfo.locked ? s_lockIcon : s_unlockIcon;
+			var min = Mathf.Min(selectionRect.width, selectionRect.height);
+			var iconSize = new Vector2(min / 2, min / 2);
+			var iconRect = new Rect(selectionRect.x, selectionRect.y, iconSize.x, iconSize.y);
 			GUI.DrawTexture(iconRect, icon.image, ScaleMode.ScaleToFit);
 		}
 
 		private static void DrawListView(Rect selectionRect, LockInfo lockInfo)
 		{
-			if (!lockInfo.HasValue)
-			{
-				return;
-			}
+			if (!lockInfo.HasValue) return;
 
-			GUIContent content = new GUIContent(
+			var content = new GUIContent(
 				$"{(lockInfo.locked ? "🔒 Locked" : "🔓 Unlocked")}{(lockInfo.owner != null ? $" by {lockInfo.owner}" : "")}"
 			);
-			Vector2 contentSize = EditorStyles.label.CalcSize(content);
-			Rect contentRect = new Rect(
-				selectionRect.x + selectionRect.width - contentSize.x - selectionRect.width / 10,
-				selectionRect.y + (selectionRect.height - contentSize.y) / 2,
+			var contentSize = EditorStyles.label.CalcSize(content);
+			var contentRect = new Rect(
+				selectionRect.x + selectionRect.width - contentSize.x - (selectionRect.width / 10),
+				selectionRect.y + ((selectionRect.height - contentSize.y) / 2),
 				contentSize.x,
 				contentSize.y
 			);
 			GUI.Label(contentRect, content, EditorStyles.label);
 		}
 
-		private static bool IsListView(Rect itemView)
-		{
-			return itemView.height < 40;
-		}
+		private static bool IsListView(Rect itemView) => itemView.height < 40;
 
-		private static bool IsListSubItem(Rect itemView)
-		{
-			return itemView.x > 15;
-		}
+		private static bool IsListSubItem(Rect itemView) => itemView.x > 15;
 
 		private static bool Get(out string path)
 		{
-			Object target = Selection.activeObject;
+			var target = Selection.activeObject;
 
 			if (!target)
 			{
@@ -105,7 +83,7 @@ namespace AssetLock.Editor.UI
 
 		private static bool Get(out FileReference reference)
 		{
-			Object target = Selection.activeObject;
+			var target = Selection.activeObject;
 
 			if (!target)
 			{
@@ -114,7 +92,7 @@ namespace AssetLock.Editor.UI
 				return false;
 			}
 
-			string path = AssetDatabase.GetAssetPath(target);
+			var path = AssetDatabase.GetAssetPath(target);
 			reference = FileReference.FromPath(path);
 
 			return true;
@@ -135,10 +113,7 @@ namespace AssetLock.Editor.UI
 		[MenuItem("Assets/AssetLock/Lock Asset", priority = Constants.CONTEXT_MENU_BASE_PRIORITY)]
 		private static void LockSelected()
 		{
-			if (!Get(out FileReference path))
-			{
-				return;
-			}
+			if (!Get(out FileReference path)) return;
 
 			AssetLockManager.Instance.LockFile(path);
 		}
@@ -146,10 +121,7 @@ namespace AssetLock.Editor.UI
 		[MenuItem("Assets/AssetLock/Lock Asset", true)]
 		private static bool CanLockSelected()
 		{
-			if (!Get(out FileReference reference, out LockInfo info))
-			{
-				return false;
-			}
+			if (!Get(out var reference, out var info)) return false;
 
 			return info is { HasValue: true, locked: false };
 		}
@@ -157,10 +129,7 @@ namespace AssetLock.Editor.UI
 		[MenuItem("Assets/AssetLock/Unlock Asset", priority = Constants.CONTEXT_MENU_BASE_PRIORITY)]
 		private static void UnlockSelected()
 		{
-			if (!Get(out FileReference path))
-			{
-				return;
-			}
+			if (!Get(out FileReference path)) return;
 
 			AssetLockManager.Instance.UnlockFile(path);
 		}
@@ -168,55 +137,41 @@ namespace AssetLock.Editor.UI
 		[MenuItem("Assets/AssetLock/Unlock Asset", true)]
 		private static bool CanUnlockSelected()
 		{
-			if (!Get(out FileReference reference, out LockInfo info))
-			{
-				return false;
-			}
+			if (!Get(out var reference, out var info)) return false;
 
 			return info is { HasValue: true, LockedByMe: true };
 		}
 
-		[MenuItem("Assets/AssetLock/Debug/Is Binary Asset", priority = Constants.CONTEXT_MENU_BASE_PRIORITY + 
-            Constants.CONTEXT_MENU_SEPARATOR * 2)]
+		[MenuItem(
+			"Assets/AssetLock/Debug/Is Binary Asset",
+			priority = Constants.CONTEXT_MENU_BASE_PRIORITY + (Constants.CONTEXT_MENU_SEPARATOR * 2)
+		)]
 		private static void IsBinaryAsset()
 		{
-			if (!Get(out FileReference reference))
-			{
-				return;
-			}
+			if (!Get(out FileReference reference)) return;
 
-			Logging.LogFormat(
-				"Is {0} Binary Asset: {1}",
-				reference.Name,
-				IsBinary(reference)
-			);
+			Logging.LogFormat("Is {0} Binary Asset: {1}", reference.Name, IsBinary(reference));
 		}
 
-		[MenuItem("Assets/AssetLock/Debug/Print Info", priority = Constants.CONTEXT_MENU_BASE_PRIORITY + 
-			Constants.CONTEXT_MENU_SEPARATOR * 2)]
+		[MenuItem(
+			"Assets/AssetLock/Debug/Print Info",
+			priority = Constants.CONTEXT_MENU_BASE_PRIORITY + (Constants.CONTEXT_MENU_SEPARATOR * 2)
+		)]
 		private static void PrintInfo()
 		{
-			if (Get(out FileReference reference, out LockInfo info))
+			if (Get(out var reference, out var info))
 			{
 				if (AddAssetReferenceToLogs)
-				{
 					Logging.Log(reference.MainAsset, info.ToString());
-				}
 				else
-				{
 					Logging.Log(info.ToString());
-				}
 			}
 			else if (reference.Exists)
 			{
 				if (AddAssetReferenceToLogs)
-				{
 					Logging.Log(reference.MainAsset, reference.ToString());
-				}
 				else
-				{
 					Logging.Log(reference.ToString());
-				}
 			}
 			else
 			{
@@ -224,43 +179,37 @@ namespace AssetLock.Editor.UI
 			}
 		}
 
-		[MenuItem("Assets/AssetLock/Force Lock", priority = Constants.CONTEXT_MENU_BASE_PRIORITY + Constants.CONTEXT_MENU_SEPARATOR)]
+		[MenuItem(
+			"Assets/AssetLock/Force Lock",
+			priority = Constants.CONTEXT_MENU_BASE_PRIORITY + Constants.CONTEXT_MENU_SEPARATOR
+		)]
 		private static void ForceLock()
 		{
-			if (!Get(out FileReference reference))
-			{
-				return;
-			}
+			if (!Get(out FileReference reference)) return;
 
 			AssetLockManager.Instance.LockFile(reference, true);
 		}
-		
+
 		[MenuItem("Assets/AssetLock/Force Lock", true)]
 		private static bool CanForceLock()
 		{
-			if (!Get(out FileReference reference, out LockInfo info))
-			{
-				return false;
-			}
+			if (!Get(out var reference, out var info)) return false;
 
 			return info is { HasValue: true, locked: false };
 		}
 
-		[MenuItem("Assets/AssetLock/Force Unlock", priority = Constants.CONTEXT_MENU_BASE_PRIORITY + Constants.CONTEXT_MENU_SEPARATOR)]
+		[MenuItem(
+			"Assets/AssetLock/Force Unlock",
+			priority = Constants.CONTEXT_MENU_BASE_PRIORITY + Constants.CONTEXT_MENU_SEPARATOR
+		)]
 		private static void ForceUnlock()
 		{
-			if (!Get(out FileReference reference))
-			{
-				return;
-			}
+			if (!Get(out FileReference reference)) return;
 
 			AssetLockManager.Instance.UnlockFile(reference, true);
 		}
-		
+
 		[MenuItem("Assets/AssetLock/Force Unlock", true)]
-		private static bool CanForceUnlock()
-		{
-			return Get(out FileReference reference, out LockInfo info);
-		}
+		private static bool CanForceUnlock() => Get(out var reference, out var info);
 	}
 }

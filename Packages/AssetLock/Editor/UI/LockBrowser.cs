@@ -23,7 +23,7 @@ namespace AssetLock.Editor.UI
 
 		private string m_searchInput = string.Empty;
 		private bool m_force;
-		
+
 		private Vector2 m_scrollPos;
 
 		private Dictionary<DirectoryReference, bool> m_expanded = new();
@@ -36,8 +36,10 @@ namespace AssetLock.Editor.UI
 			if (!UseLegacyBrowser)
 			{
 				LockBrowserToolkit.Open();
+
 				return;
 			}
+
 			OpenLegacy();
 		}
 
@@ -45,15 +47,25 @@ namespace AssetLock.Editor.UI
 		{
 			var legacy = Resources.FindObjectsOfTypeAll<LockBrowser>();
 			var modern = Resources.FindObjectsOfTypeAll<LockBrowserToolkit>();
+
 			if (legacy.Length == 0 && modern.Length == 0) return;
+
 			if (UseLegacyBrowser)
 			{
-				foreach (var window in modern) window.Close();
+				foreach (var window in modern)
+				{
+					window.Close();
+				}
+
 				OpenLegacy();
 			}
 			else
 			{
-				foreach (var window in legacy) window.Close();
+				foreach (var window in legacy)
+				{
+					window.Close();
+				}
+
 				LockBrowserToolkit.Open();
 			}
 		}
@@ -78,39 +90,38 @@ namespace AssetLock.Editor.UI
 
 		private void InfoGUI()
 		{
-			if (AssetLockManager.Instance?.IsReady != true || !MasterEnable)
-			{
-				return;
-			}
+			if (AssetLockManager.Instance?.IsReady != true || !MasterEnable) return;
+
 			if (AssetLockManager.Instance.AutomaticRefreshPaused)
-			{
-				EditorGUILayout.HelpBox("Automatic refresh paused. Check Git credentials, then select Refresh All to retry.", MessageType.Warning);
-			}
-			
-			GUIContent labelContent = new GUIContent("File Count:");
-			GUIContent trackedCount = new GUIContent(
+				HelpBox(
+					"Automatic refresh paused. Check Git credentials, then select Refresh All to retry.",
+					MessageType.Warning
+				);
+
+			var labelContent = new GUIContent("File Count:");
+			var trackedCount = new GUIContent(
 				AssetLockManager.Instance.TrackedCount.ToString(),
 				"Total number of files being tracked by Asset Lock"
 			);
-			GUIContent lockedCount = new GUIContent(
+			var lockedCount = new GUIContent(
 				AssetLockManager.Instance.LockedCount.ToString(),
 				"Total number of files currently locked by Asset Lock"
 			);
-			GUIContent userLockCount = new GUIContent(
+			var userLockCount = new GUIContent(
 				AssetLockManager.Instance.LockedByMeCount.ToString(),
 				"Total number of files locked by the current user"
 			);
-			GUIContent otherLockCount = new GUIContent(
+			var otherLockCount = new GUIContent(
 				AssetLockManager.Instance.LockedByOthersCount.ToString(),
 				"Total number of files locked by other users"
 			);
-			GUIContent unlockedCount = new GUIContent(
+			var unlockedCount = new GUIContent(
 				AssetLockManager.Instance.UnlockedCount.ToString(),
 				"Total number of files that are not locked"
 			);
 
-			GUIContent statusLabel = new GUIContent("Master Status:", "Enable or disable all Asset Lock features");
-			GUIContent autoLockLabel = new GUIContent("Auto-Lock:", "Automatically lock files when opening them");
+			var statusLabel = new GUIContent("Master Status:", "Enable or disable all Asset Lock features");
+			var autoLockLabel = new GUIContent("Auto-Lock:", "Automatically lock files when opening them");
 
 			GUILayout.Label("Info:", boldLabel);
 			EditorGUI.indentLevel++;
@@ -139,24 +150,21 @@ namespace AssetLock.Editor.UI
 
 		private void ActionsGUI()
 		{
-			GUIContent refreshLabel = new GUIContent("Refresh All", "Refresh the lock status of all tracked files");
-			GUIContent parseLabel = new GUIContent("Parse All", "Parse all files in the project for tracking");
-			GUIContent unlockAllLabel = new GUIContent("Unlock All", "Unlock all files locked by you");
-			GUIContent forceRefreshLabel = new GUIContent(
+			var refreshLabel = new GUIContent("Refresh All", "Refresh the lock status of all tracked files");
+			var parseLabel = new GUIContent("Parse All", "Parse all files in the project for tracking");
+			var unlockAllLabel = new GUIContent("Unlock All", "Unlock all files locked by you");
+			var forceRefreshLabel = new GUIContent(
 				"Force Refresh",
 				"Force a refresh of all tracked files (May be slow)"
 			);
-			GUIContent rebootLabel = new GUIContent("Reboot", "Reboot the AssetLockManager");
-			GUIContent expandAllLabel = new GUIContent("Expand All", "Expand all directories");
-			GUIContent collapseAllLabel = new GUIContent("Collapse All", "Collapse all directories");
+			var rebootLabel = new GUIContent("Reboot", "Reboot the AssetLockManager");
+			var expandAllLabel = new GUIContent("Expand All", "Expand all directories");
+			var collapseAllLabel = new GUIContent("Collapse All", "Collapse all directories");
 
 			if (AssetLockManager.Instance?.IsReady != true || !MasterEnable)
 			{
-				EditorGUILayout.HelpBox("Asset Lock is not ready. Configure it in Preferences, then reboot.", MessageType.Info);
-				if (GUILayout.Button(rebootLabel))
-				{
-					AssetLockManager.Reboot();
-				}
+				HelpBox("Asset Lock is not ready. Configure it in Preferences, then reboot.", MessageType.Info);
+				if (GUILayout.Button(rebootLabel)) AssetLockManager.Reboot();
 
 				return;
 			}
@@ -166,78 +174,56 @@ namespace AssetLock.Editor.UI
 
 			using (new HorizontalScope())
 			{
-				if (GUILayout.Button(refreshLabel))
-				{
-					DoAsync(() => AssetLockManager.Instance.RefreshAsync());
-				}
+				if (GUILayout.Button(refreshLabel)) DoAsync(() => AssetLockManager.Instance.RefreshAsync());
 
 				EditorGUI.BeginDisabledGroup(AssetLockManager.Instance.AutomaticRefreshPaused);
 
-				if (GUILayout.Button(parseLabel))
-				{
-					AssetLockManager.Instance.ParseAll();
-				}
+				if (GUILayout.Button(parseLabel)) AssetLockManager.Instance.ParseAll();
 
-				if (GUILayout.Button(unlockAllLabel))
-				{
-					AssetLockManager.Instance.UnlockAll();
-				}
+				if (GUILayout.Button(unlockAllLabel)) AssetLockManager.Instance.UnlockAll();
 				EditorGUI.EndDisabledGroup();
 			}
 
 			if (m_force)
-			{
 				using (new HorizontalScope())
 				{
-					if (GUILayout.Button(forceRefreshLabel))
-					{
-						AssetLockManager.Instance.ForceRefresh();
-					}
+					if (GUILayout.Button(forceRefreshLabel)) AssetLockManager.Instance.ForceRefresh();
 
-					if (GUILayout.Button(rebootLabel))
-					{
-						AssetLockManager.Reboot();
-					}
+					if (GUILayout.Button(rebootLabel)) AssetLockManager.Reboot();
 				}
-			}
 
 			EditorGUI.EndDisabledGroup();
 
 			using (new HorizontalScope())
 			{
-				if (GUILayout.Button(expandAllLabel))
-				{
-					SetAllExpanded(true);
-				}
+				if (GUILayout.Button(expandAllLabel)) SetAllExpanded(true);
 
-				if (GUILayout.Button(collapseAllLabel))
-				{
-					SetAllExpanded(false);
-				}
+				if (GUILayout.Button(collapseAllLabel)) SetAllExpanded(false);
 			}
 
-			GUIContent forceLabel = new GUIContent("Show Force Controls", "Show force lock/unlock controls");
+			var forceLabel = new GUIContent("Show Force Controls", "Show force lock/unlock controls");
 			m_force = Toggle(forceLabel, m_force);
 		}
 
 		private void FilesGUI()
 		{
-			if (AssetLockManager.Instance?.IsReady != true || !MasterEnable)
-			{
-				return;
-			}
-			
-			GUIContent refreshLabel = EditorGUIUtility.IconContent("d_Refresh");
+			if (AssetLockManager.Instance?.IsReady != true || !MasterEnable) return;
+
+			var refreshLabel = EditorGUIUtility.IconContent("d_Refresh");
 
 			using (new HorizontalScope())
 			{
 				EditorGUI.BeginChangeCheck();
-				m_searchInput = DelayedTextField(new GUIContent("Search:", "Use * to match any text; wildcard patterns match the whole name or path."), m_searchInput);
+				m_searchInput = DelayedTextField(
+					new GUIContent(
+						"Search:",
+						"Use * to match any text; wildcard patterns match the whole name or path."
+					),
+					m_searchInput
+				);
 
 				if (EditorGUI.EndChangeCheck() || !m_expanded.Any())
-				{
 					ParseDirectory(AssetLockManager.Instance.UnityDataDirectoryReference, m_searchInput, out _);
-				}
 
 				if (GUILayout.Button(refreshLabel, GUILayout.Width(30)))
 				{
@@ -252,16 +238,26 @@ namespace AssetLock.Editor.UI
 			m_scrollPos = BeginScrollView(m_scrollPos);
 			DisplayFolder(AssetLockManager.Instance.UnityDataDirectoryReference, m_searchInput);
 			EndScrollView();
-			
+
 			EditorGUI.indentLevel--;
 		}
 
 		private static async void DoAsync(Func<Task> action)
 		{
 			s_busy = true;
-			try { await action(); }
-			catch (Exception error) { Logging.LogErrorFormat("Asset Lock operation failed ({0}).", error.GetType().Name); }
-			finally { s_busy = false; }
+
+			try
+			{
+				await action();
+			}
+			catch (Exception error)
+			{
+				Logging.LogErrorFormat("Asset Lock operation failed ({0}).", error.GetType().Name);
+			}
+			finally
+			{
+				s_busy = false;
+			}
 		}
 
 		private void SetAllExpanded(bool value)
@@ -284,12 +280,9 @@ namespace AssetLock.Editor.UI
 			}
 
 			valid = dir.Files.Any(f => f.Tracked);
-			bool open = IsDirectoryMatching(dir, ctx);
+			var open = IsDirectoryMatching(dir, ctx);
 
-			if (!open)
-			{
-				open |= dir.EnumerateTrackedChildFiles().Any(f => IsFileMatching(f, ctx));
-			}
+			if (!open) open |= dir.EnumerateTrackedChildFiles().Any(f => IsFileMatching(f, ctx));
 
 			foreach (var directory in dir.Directories)
 			{
@@ -298,30 +291,20 @@ namespace AssetLock.Editor.UI
 			}
 
 			if (valid)
-			{
 				m_expanded[dir] = open;
-			}
 			else
-			{
 				m_expanded.Remove(dir);
-			}
 
 			return open;
 		}
 
 		private IEnumerable<DirectoryReference> GetMatchingDirectories(DirectoryReference dir)
 		{
-			if (!dir.Exists)
-			{
-				yield break;
-			}
+			if (!dir.Exists) yield break;
 
 			foreach (var directory in dir.Directories)
 			{
-				if (m_expanded.ContainsKey(directory))
-				{
-					yield return directory;
-				}
+				if (m_expanded.ContainsKey(directory)) yield return directory;
 			}
 		}
 
@@ -330,9 +313,11 @@ namespace AssetLock.Editor.UI
 			if (ctx != null && ctx.IndexOf('*') >= 0)
 			{
 				var pattern = ctx.Trim();
+
 				return MatchesBrowserSearch(file.NameWithExtension, pattern) ||
-				       MatchesBrowserSearch(file.UnityPath.Replace('\\', '/'), pattern.Replace('\\', '/'));
+					MatchesBrowserSearch(file.UnityPath.Replace('\\', '/'), pattern.Replace('\\', '/'));
 			}
+
 			return MatchSearchGroups(ctx, file.NameWithExtension);
 		}
 
@@ -341,33 +326,26 @@ namespace AssetLock.Editor.UI
 			if (ctx != null && ctx.IndexOf('*') >= 0)
 			{
 				var pattern = ctx.Trim();
+
 				return MatchesBrowserSearch(dir.Name, pattern) ||
-				       MatchesBrowserSearch(dir.UnityPath.Replace('\\', '/'), pattern.Replace('\\', '/'));
+					MatchesBrowserSearch(dir.UnityPath.Replace('\\', '/'), pattern.Replace('\\', '/'));
 			}
+
 			return MatchSearchGroups(ctx, dir.Name);
 		}
 
 		private void DisplayFolder(DirectoryReference dir, string ctx, string prefix = "")
 		{
-			if (!dir.Exists)
-			{
-				return;
-			}
+			if (!dir.Exists) return;
 
-			string key = prefix + dir.Name;
+			var key = prefix + dir.Name;
 
-			if (!m_expanded.TryGetValue(dir, out var exp))
-			{
-				return;
-			}
+			if (!m_expanded.TryGetValue(dir, out var exp)) return;
 
-			GUIContent nameLabel = new GUIContent(prefix + dir.Name, dir.AbsolutePath);
-			GUIContent refreshLabel = new GUIContent(
-				"Refresh",
-				"Refresh the lock status of all files in this directory"
-			);
-			GUIContent lockLabel = new GUIContent("Lock All", "Lock all files in this directory");
-			GUIContent unlockLabel = new GUIContent("Unlock All", "Unlock all files in this directory");
+			var nameLabel = new GUIContent(prefix + dir.Name, dir.AbsolutePath);
+			var refreshLabel = new GUIContent("Refresh", "Refresh the lock status of all files in this directory");
+			var lockLabel = new GUIContent("Lock All", "Lock all files in this directory");
+			var unlockLabel = new GUIContent("Unlock All", "Unlock all files in this directory");
 
 			var subdirs = GetMatchingDirectories(dir).ToList();
 			var files = dir.EnumerateTrackedChildFiles().Distinct().ToList();
@@ -380,36 +358,24 @@ namespace AssetLock.Editor.UI
 				return;
 			}
 
-			bool dirMatch = IsDirectoryMatching(dir, ctx);
+			var dirMatch = IsDirectoryMatching(dir, ctx);
 
 			using (new HorizontalScope())
 			{
 				exp = Foldout(exp, nameLabel);
 				GUILayout.FlexibleSpace();
 
-				if (!m_dirBusy.TryGetValue(dir, out var busy))
-				{
-					m_dirBusy[dir] = false;
-				}
+				if (!m_dirBusy.TryGetValue(dir, out var busy)) m_dirBusy[dir] = false;
 
 				if (files.Any())
 				{
 					EditorGUI.BeginDisabledGroup(busy || AssetLockManager.Instance.AutomaticRefreshPaused);
 
-					if (GUILayout.Button(refreshLabel))
-					{
-						DoDirAction(dir.RefreshChildrenLocksAsync);
-					}
+					if (GUILayout.Button(refreshLabel)) DoDirAction(dir.RefreshChildrenLocksAsync);
 
-					if (GUILayout.Button(lockLabel))
-					{
-						DoDirAction(() => dir.LockChildrenAsync(m_force));
-					}
+					if (GUILayout.Button(lockLabel)) DoDirAction(() => dir.LockChildrenAsync(m_force));
 
-					if (GUILayout.Button(unlockLabel))
-					{
-						DoDirAction(() => dir.UnlockChildrenAsync(m_force));
-					}
+					if (GUILayout.Button(unlockLabel)) DoDirAction(() => dir.UnlockChildrenAsync(m_force));
 
 					EditorGUI.EndDisabledGroup();
 				}
@@ -417,10 +383,7 @@ namespace AssetLock.Editor.UI
 
 			m_expanded[dir] = exp;
 
-			if (!exp)
-			{
-				return;
-			}
+			if (!exp) return;
 
 			EditorGUI.indentLevel += 2;
 
@@ -431,10 +394,7 @@ namespace AssetLock.Editor.UI
 
 			foreach (var file in files)
 			{
-				if (file.IsMeta)
-				{
-					continue;
-				}
+				if (file.IsMeta) continue;
 
 				// if the directory matches the search, display all files
 				DisplayLock(file, dirMatch ? string.Empty : ctx, m_dirBusy[dir]);
@@ -445,36 +405,40 @@ namespace AssetLock.Editor.UI
 			async void DoDirAction(Func<Task> action)
 			{
 				m_dirBusy[dir] = true;
-				try { await action(); }
-				catch (Exception error) { Logging.LogErrorFormat("Asset Lock operation failed ({0}).", error.GetType().Name); }
-				finally { m_dirBusy[dir] = false; }
+
+				try
+				{
+					await action();
+				}
+				catch (Exception error)
+				{
+					Logging.LogErrorFormat("Asset Lock operation failed ({0}).", error.GetType().Name);
+				}
+				finally
+				{
+					m_dirBusy[dir] = false;
+				}
 			}
 		}
 
 		private void DisplayLock(FileReference file, string ctx, bool forceBusy = false)
 		{
-			if (!IsFileMatching(file, ctx))
-			{
-				return;
-			}
+			if (!IsFileMatching(file, ctx)) return;
 
-			if (!file.TryGetLock(out var info))
-			{
-				return;
-			}
+			if (!file.TryGetLock(out var info)) return;
 
-			GUIContent nameLabel = new GUIContent(file.NameWithExtension, file.AssetPath);
-			GUIContent refreshLabel = new GUIContent("Refresh", "Refresh the lock status of this file");
-			GUIContent lockLabel = new GUIContent("Lock", "Lock this file");
-			GUIContent unlockLabel = new GUIContent("Unlock", "Unlock this file");
-			GUIContent lockedLabel = new GUIContent("Locked", "This file is locked");
-			GUIContent ownerLabel = new GUIContent(info.owner, info.lockedAt);
-			GUIContent meLabel = new GUIContent("Me", info.lockedAt);
-			GUIContent forceLockLabel = new GUIContent(
+			var nameLabel = new GUIContent(file.NameWithExtension, file.AssetPath);
+			var refreshLabel = new GUIContent("Refresh", "Refresh the lock status of this file");
+			var lockLabel = new GUIContent("Lock", "Lock this file");
+			var unlockLabel = new GUIContent("Unlock", "Unlock this file");
+			var lockedLabel = new GUIContent("Locked", "This file is locked");
+			var ownerLabel = new GUIContent(info.owner, info.lockedAt);
+			var meLabel = new GUIContent("Me", info.lockedAt);
+			var forceLockLabel = new GUIContent(
 				"Force Lock",
 				"Requires administrator privileges for this git repository"
 			);
-			GUIContent forceUnlockLabel = new GUIContent(
+			var forceUnlockLabel = new GUIContent(
 				"Force Unlock",
 				"Requires administrator privileges for this git repository"
 			);
@@ -484,18 +448,13 @@ namespace AssetLock.Editor.UI
 				Indent();
 
 				if (GUILayout.Button(nameLabel, label))
-				{
 					Selection.activeObject = AssetDatabase.LoadMainAssetAtPath(info.path);
-				}
 
 				GUILayout.FlexibleSpace();
 				DrawLockStatus();
 				GUILayout.Space(20);
 
-				if (!m_busy.TryGetValue(file, out var busy))
-				{
-					m_busy[file] = false;
-				}
+				if (!m_busy.TryGetValue(file, out var busy)) m_busy[file] = false;
 
 				busy |= forceBusy || AssetLockManager.Instance.AutomaticRefreshPaused;
 
@@ -503,48 +462,29 @@ namespace AssetLock.Editor.UI
 
 				if (m_force)
 				{
-					if (GUILayout.Button(forceLockLabel))
-					{
-						DoFileAction(() => file.LockFileAsync(true));
-					}
+					if (GUILayout.Button(forceLockLabel)) DoFileAction(() => file.LockFileAsync(true));
 
-					if (GUILayout.Button(forceUnlockLabel))
-					{
-						DoFileAction(() => file.UnlockFileAsync(true));
-					}
+					if (GUILayout.Button(forceUnlockLabel)) DoFileAction(() => file.UnlockFileAsync(true));
 				}
 				else if (info.locked)
 				{
 					if (info.LockedByMe)
-					{
 						if (GUILayout.Button(unlockLabel))
-						{
 							DoFileAction(() => file.UnlockFileAsync());
-						}
-					}
 				}
 				else
 				{
-					if (GUILayout.Button(lockLabel))
-					{
-						DoFileAction(() => file.LockFileAsync());
-					}
+					if (GUILayout.Button(lockLabel)) DoFileAction(() => file.LockFileAsync());
 				}
 
-				if (GUILayout.Button(refreshLabel))
-				{
-					DoFileAction(file.RefreshLockAsync);
-				}
+				if (GUILayout.Button(refreshLabel)) DoFileAction(file.RefreshLockAsync);
 
 				EditorGUI.EndDisabledGroup();
 			}
 
 			void DrawLockStatus()
 			{
-				if (!m_busy.TryGetValue(file, out var busy))
-				{
-					m_busy[file] = false;
-				}
+				if (!m_busy.TryGetValue(file, out var busy)) m_busy[file] = false;
 
 				using (new HorizontalScope())
 				{
@@ -571,9 +511,19 @@ namespace AssetLock.Editor.UI
 			async void DoFileAction(Func<Task> action)
 			{
 				m_busy[file] = true;
-				try { await action(); }
-				catch (Exception error) { Logging.LogErrorFormat("Asset Lock operation failed ({0}).", error.GetType().Name); }
-				finally { m_busy[file] = false; }
+
+				try
+				{
+					await action();
+				}
+				catch (Exception error)
+				{
+					Logging.LogErrorFormat("Asset Lock operation failed ({0}).", error.GetType().Name);
+				}
+				finally
+				{
+					m_busy[file] = false;
+				}
 			}
 		}
 	}

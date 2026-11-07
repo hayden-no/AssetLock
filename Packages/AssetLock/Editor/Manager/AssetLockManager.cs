@@ -38,11 +38,16 @@ namespace AssetLock.Editor.Manager
 		internal bool IsInitializing => !m_disposed && m_initializing;
 
 		internal DirectoryReference UnityProjectDirectoryReference { get; }
+
 		// Assets directory
 		internal DirectoryReference UnityDataDirectoryReference { get; }
 		internal DirectoryReference GitWorkingDirectoryReference { get; private set; }
-		internal bool IsReady => !m_disposed && m_lockRepo != null && m_lfsInitialized &&
-		                         !string.IsNullOrEmpty(GitWorkingDirectoryReference.AbsolutePath);
+
+		internal bool IsReady =>
+			!m_disposed &&
+			m_lockRepo != null &&
+			m_lfsInitialized &&
+			!string.IsNullOrEmpty(GitWorkingDirectoryReference.AbsolutePath);
 
 		private bool m_disposed;
 
@@ -88,6 +93,7 @@ namespace AssetLock.Editor.Manager
 		/// The singleton instance of the AssetLockManager.
 		/// </summary>
 		public static AssetLockManager Instance { get; private set; }
+
 		internal static Func<AssetLockManager> TestFactory { get; set; }
 
 		/// <summary>
@@ -96,7 +102,7 @@ namespace AssetLock.Editor.Manager
 		public static void Reboot()
 		{
 			Instance?.Dispose();
-			Instance = AssetLockSettings.TestMode && TestFactory != null ? TestFactory() : new AssetLockManager();
+			Instance = TestMode && TestFactory != null ? TestFactory() : new AssetLockManager();
 		}
 
 		/// <summary>
@@ -104,10 +110,7 @@ namespace AssetLock.Editor.Manager
 		/// </summary>
 		static AssetLockManager()
 		{
-			if (!AssetLockSettings.TestMode)
-			{
-				Instance ??= new AssetLockManager();
-			}
+			if (!TestMode) Instance ??= new AssetLockManager();
 		}
 
 		private AssetLockManager()
@@ -119,10 +122,7 @@ namespace AssetLock.Editor.Manager
 				return;
 			}
 
-			if (!MasterEnable)
-			{
-				return;
-			}
+			if (!MasterEnable) return;
 
 			// FIXME: disable for now
 			// m_lockRepo = LockRepo.Deserialize(s_repoSerialized.value);
@@ -143,7 +143,8 @@ namespace AssetLock.Editor.Manager
 
 		internal AssetLockManager(IProcessRunner git, IProcessRunner lfs)
 		{
-			if (!AssetLockSettings.TestMode) throw new InvalidOperationException("Test mode is required.");
+			if (!TestMode) throw new InvalidOperationException("Test mode is required.");
+
 			m_gitProcess = git;
 			m_lfsProcess = lfs;
 			m_lockRepo = new LockRepo();
@@ -153,7 +154,8 @@ namespace AssetLock.Editor.Manager
 
 		internal static void SetTestInstance(AssetLockManager manager)
 		{
-			if (!AssetLockSettings.TestMode) throw new InvalidOperationException("Test mode is required.");
+			if (!TestMode) throw new InvalidOperationException("Test mode is required.");
+
 			Instance?.Dispose();
 			Instance = manager;
 		}
@@ -174,10 +176,7 @@ namespace AssetLock.Editor.Manager
 		public void Dispose()
 		{
 			CancelWarningAutoLocks("AssetLock was stopped before the lock could be acquired.");
-			if (m_lockRepo != null)
-			{
-				s_repoSerialized.SetValue(m_lockRepo?.Serialize(), true);
-			}
+			if (m_lockRepo != null) s_repoSerialized.SetValue(m_lockRepo?.Serialize(), true);
 
 			EditorApplication.projectWindowItemOnGUI -= ProjectWindowGUI.DrawOnProjectWindowGUI;
 			EditorApplication.update -= EditorLoop;
@@ -196,10 +195,7 @@ Please configure both the user Preferences and Project Settings for AssetLock.
 Finally, reboot AssetLock to finish setup.  There is a button in the Lock Browser or Preferences window to do this.";
 			const string confirm = "OK";
 
-			if (!Application.isBatchMode)
-			{
-				EditorUtility.DisplayDialog(title, message, confirm);
-			}
+			if (!Application.isBatchMode) EditorUtility.DisplayDialog(title, message, confirm);
 
 			Debug.Log($"[AssetLock] {message}");
 		}
@@ -209,13 +205,9 @@ Finally, reboot AssetLock to finish setup.  There is a button in the Lock Browse
 			if (result.ExitCode != 0)
 			{
 				if (string.IsNullOrWhiteSpace(msg))
-				{
 					Logging.LogError(result.StdErr);
-				}
 				else
-				{
 					Logging.LogErrorFormat("{0}\n{1}", msg, result.StdErr);
-				}
 
 				throw new Exception(result.StdErr);
 			}
@@ -225,12 +217,9 @@ Finally, reboot AssetLock to finish setup.  There is a button in the Lock Browse
 		{
 			if (!m_lfsInitialized)
 			{
-				if (m_lfsFailed)
-				{
-					Throw();
-				}
+				if (m_lfsFailed) Throw();
 
-				int iter = 0;
+				var iter = 0;
 
 				while (iter < Constants.DEFAULT_LOCK_TIMEOUT)
 				{
@@ -245,10 +234,7 @@ Finally, reboot AssetLock to finish setup.  There is a button in the Lock Browse
 				}
 			}
 
-			void Throw()
-			{
-				throw new InvalidOperationException("Git-LFS not initialized, please reboot AssetLock");
-			}
+			void Throw() => throw new InvalidOperationException("Git-LFS not initialized, please reboot AssetLock");
 		}
 
 		private void ParseDirectory(DirectoryReference dir, List<DirectoryReference> dirs)

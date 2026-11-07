@@ -14,12 +14,10 @@ namespace AssetLock.Editor.Data
 
 		[JsonProperty("owner")] public LocksResponseOwnerDataJson Owner;
 
-		public string Name => this.Owner.Name;
+		public string Name => Owner.Name;
 
-		public static implicit operator LockInfo(LocksResponseDataJson data)
-		{
-			return FileReference.FromPath(data.Path).ToLock(true, data.ID, data.Name, data.LockedAt);
-		}
+		public static implicit operator LockInfo(LocksResponseDataJson data) =>
+			FileReference.FromPath(data.Path).ToLock(true, data.ID, data.Name, data.LockedAt);
 	}
 
 	[JsonObject]
@@ -34,10 +32,7 @@ namespace AssetLock.Editor.Data
 		[JsonProperty("path")] public string Path;
 		[JsonProperty("ref")] public GitLfsRefObject Ref;
 
-		public override string ToString()
-		{
-			return Path;
-		}
+		public override string ToString() => Path;
 	}
 
 	[JsonObject]
@@ -45,10 +40,7 @@ namespace AssetLock.Editor.Data
 	{
 		[JsonProperty("name")] public string Name;
 
-		public override string ToString()
-		{
-			return Name;
-		}
+		public override string ToString() => Name;
 	}
 
 	[JsonObject]
@@ -56,10 +48,7 @@ namespace AssetLock.Editor.Data
 	{
 		[JsonProperty("lock")] public LocksResponseDataJson Lock;
 
-		public override string ToString()
-		{
-			return Lock.ToString();
-		}
+		public override string ToString() => Lock.ToString();
 	}
 
 	[JsonObject]
@@ -71,10 +60,7 @@ namespace AssetLock.Editor.Data
 		[JsonProperty("documentation_url")] public string DocumentationUrl;
 		[JsonProperty("request_id")] public string RequestId;
 
-		public override string ToString()
-		{
-			return $"{RequestId}: {Message} ({DocumentationUrl})";
-		}
+		public override string ToString() => $"{RequestId}: {Message} ({DocumentationUrl})";
 	}
 
 	[JsonObject]
@@ -84,10 +70,7 @@ namespace AssetLock.Editor.Data
 		[JsonProperty("documentation_url")] public string DocumentationUrl;
 		[JsonProperty("request_id")] public string RequestId;
 
-		public override string ToString()
-		{
-			return $"{RequestId}: {Message} ({DocumentationUrl})";
-		}
+		public override string ToString() => $"{RequestId}: {Message} ({DocumentationUrl})";
 	}
 
 	[JsonObject]
@@ -97,10 +80,7 @@ namespace AssetLock.Editor.Data
 		[JsonProperty("documentation_url")] public string DocumentationUrl;
 		[JsonProperty("request_id")] public string RequestId;
 
-		public override string ToString()
-		{
-			return $"{RequestId}: {Message} ({DocumentationUrl})";
-		}
+		public override string ToString() => $"{RequestId}: {Message} ({DocumentationUrl})";
 	}
 
 	[JsonObject]
@@ -116,10 +96,7 @@ namespace AssetLock.Editor.Data
 
 		[JsonProperty("ref")] public GitLfsRefObject Ref;
 
-		public override string ToString()
-		{
-			return $"{Id}: {Path}";
-		}
+		public override string ToString() => $"{Id}: {Path}";
 
 		public string ToURI(string baseUrl)
 		{
@@ -131,7 +108,7 @@ namespace AssetLock.Editor.Data
 
 			StringBuilder sb = new();
 			sb.Append(baseUrl);
-			bool any = false;
+			var any = false;
 
 			if (!string.IsNullOrWhiteSpace(Path))
 			{
@@ -212,10 +189,7 @@ namespace AssetLock.Editor.Data
 
 		[JsonProperty("next_cursor")] public string NextCursor;
 
-		public override string ToString()
-		{
-			return $"{Locks.Length} locks";
-		}
+		public override string ToString() => $"{Locks.Length} locks";
 	}
 
 	[JsonObject]
@@ -225,9 +199,6 @@ namespace AssetLock.Editor.Data
 		[JsonProperty("force")] public bool Force;
 		[JsonProperty("ref")] public GitLfsRefObject Ref;
 
-		public override string ToString()
-		{
-			return $"Force: {Force}";
-		}
+		public override string ToString() => $"Force: {Force}";
 	}
 }

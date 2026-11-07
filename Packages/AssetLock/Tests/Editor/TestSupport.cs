@@ -9,63 +9,70 @@ using static AssetLock.Editor.AssetLockSettings;
 
 namespace AssetLock.Editor.Tests
 {
-    internal sealed class FakeProcess : IProcessRunner
-    {
-        internal readonly List<string[]> Calls = new();
-        internal Func<string[], ProcessResult> Run;
-        internal Func<string[], Task<ProcessResult>> RunAsync;
+	internal sealed class FakeProcess : IProcessRunner
+	{
+		internal readonly List<string[]> Calls = new();
+		internal Func<string[], ProcessResult> Run;
+		internal Func<string[], Task<ProcessResult>> RunAsync;
 
-        public Task<ProcessResult> RunCommandAsync(params string[] args)
-        {
-            Calls.Add(args);
-            return RunAsync != null ? RunAsync(args) : Task.FromResult(Run(args));
-        }
+		public Task<ProcessResult> RunCommandAsync(params string[] args)
+		{
+			Calls.Add(args);
 
-        internal static ProcessResult Result(string[] args, string output = "", int exitCode = 0, string error = "") =>
-            new(args, exitCode, output, error);
-    }
+			return RunAsync != null ? RunAsync(args) : Task.FromResult(Run(args));
+		}
 
-    internal abstract class ManagerFixture
-    {
-        protected AssetLockManager Manager;
-        protected FakeProcess Git;
-        protected FakeProcess Lfs;
+		internal static ProcessResult Result(string[] args, string output = "", int exitCode = 0, string error = "") =>
+			new(args, exitCode, output, error);
+	}
 
-        [SetUp]
-        public void SetUpManager()
-        {
-            Assert.That(TestMode, Is.True, "Run the tests with -assetLockTestMode to isolate settings and prevent Git startup.");
-            MasterEnable.SetValue(true);
-            IsFirstTimeExperience.SetValue(false);
-            ParseFilesOnStartup.SetValue(false);
-            AutoLock.SetValue(false);
-            WarnOnly.SetValue(false);
-            SuppressAutoLockFailureDialogs.SetValue(false);
-            UseLegacyBrowser.SetValue(false);
-            TrackNonBinaryFiles.SetValue(true);
-            TrackedFileEndings.SetValue(new List<string> { ".bin", ".asset" });
-            GitRemoteUrl.SetValue("https://example.test/repo");
-            GitWorkingDirectory.SetValue("");
-            UseHttp.SetValue(false);
-            UseGitCredentialHelper.SetValue(false);
-            GitCredentialClient.TestCommand = null;
-            LogHttp.SetValue(false);
-            var project = Directory.GetParent(Application.dataPath).FullName;
-            Git = new FakeProcess { Run = args => FakeProcess.Result(args, "tester\n") };
-            Lfs = new FakeProcess { Run = args => FakeProcess.Result(args,
-                args[0] == "env" ? $"LocalWorkingDir={project}\n" : "") };
-            Manager = new AssetLockManager(Git, Lfs);
-            AssetLockManager.SetTestInstance(Manager);
-        }
+	internal abstract class ManagerFixture
+	{
+		protected AssetLockManager Manager;
+		protected FakeProcess Git;
+		protected FakeProcess Lfs;
 
-        protected void Initialize() => Manager.InitializeForTests().GetAwaiter().GetResult();
+		[SetUp]
+		public void SetUpManager()
+		{
+			Assert.That(
+				TestMode,
+				Is.True,
+				"Run the tests with -assetLockTestMode to isolate settings and prevent Git startup."
+			);
+			MasterEnable.SetValue(true);
+			IsFirstTimeExperience.SetValue(false);
+			ParseFilesOnStartup.SetValue(false);
+			AutoLock.SetValue(false);
+			WarnOnly.SetValue(false);
+			SuppressAutoLockFailureDialogs.SetValue(false);
+			UseLegacyBrowser.SetValue(false);
+			TrackNonBinaryFiles.SetValue(true);
+			TrackedFileEndings.SetValue(new List<string> { ".bin", ".asset" });
+			GitRemoteUrl.SetValue("https://example.test/repo");
+			GitWorkingDirectory.SetValue("");
+			UseHttp.SetValue(false);
+			UseGitCredentialHelper.SetValue(false);
+			GitCredentialClient.TestCommand = null;
+			LogHttp.SetValue(false);
+			var project = Directory.GetParent(Application.dataPath).FullName;
+			Git = new FakeProcess { Run = args => FakeProcess.Result(args, "tester\n") };
+			Lfs = new FakeProcess
+			{
+				Run = args => FakeProcess.Result(args, args[0] == "env" ? $"LocalWorkingDir={project}\n" : "")
+			};
+			Manager = new AssetLockManager(Git, Lfs);
+			AssetLockManager.SetTestInstance(Manager);
+		}
 
-        [TearDown]
-        public void TearDownManager()
-        {
-            AssetLockManager.TestFactory = null;
-            GitCredentialClient.TestCommand = null;
-            AssetLockManager.SetTestInstance(null);
-        }
-    }
+		protected void Initialize() => Manager.InitializeForTests().GetAwaiter().GetResult();
+
+		[TearDown]
+		public void TearDownManager()
+		{
+			AssetLockManager.TestFactory = null;
+			GitCredentialClient.TestCommand = null;
+			AssetLockManager.SetTestInstance(null);
+		}
+	}
 }

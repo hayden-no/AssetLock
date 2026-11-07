@@ -17,63 +17,50 @@ namespace AssetLock.Editor.Data
 
 		private FileReference(string path, bool allowMeta)
 		{
-			if (string.IsNullOrWhiteSpace(path))
-			{
-				throw new ArgumentException("Path is null or empty.");
-			}
+			if (string.IsNullOrWhiteSpace(path)) throw new ArgumentException("Path is null or empty.");
 
-			if (!allowMeta)
-			{
-				path = AssetLockUtility.GetPathWithoutMeta(path);
-			}
+			if (!allowMeta) path = AssetLockUtility.GetPathWithoutMeta(path);
 
 			// sanitize path
 			path = path.Replace("\"", string.Empty);
 
-			this.AbsolutePath = AssetLockUtility.GetFullPath(path);
+			AbsolutePath = AssetLockUtility.GetFullPath(path);
 		}
 
-		public string Name => Path.GetFileNameWithoutExtension(this.AbsolutePath);
-		public string NameWithExtension => Path.GetFileName(this.AbsolutePath);
-		public string UnityPath => AssetLockUtility.ToUnityRelativePath(this.AbsolutePath);
-		public string AssetPath => AssetLockUtility.ToUnityAssetsRelativePath(this.AbsolutePath);
-		public string GitPath => AssetLockUtility.ToGitRelativePath(this.AbsolutePath);
-		public string UnityMetaPath => $"{this.UnityPath}.meta";
-		public string Guid => AssetDatabase.AssetPathToGUID(this.UnityPath);
-		public bool Exists => File.Exists(this.AbsolutePath);
-		public string Extension => Path.GetExtension(this.AbsolutePath);
+		public string Name => Path.GetFileNameWithoutExtension(AbsolutePath);
+		public string NameWithExtension => Path.GetFileName(AbsolutePath);
+		public string UnityPath => AssetLockUtility.ToUnityRelativePath(AbsolutePath);
+		public string AssetPath => AssetLockUtility.ToUnityAssetsRelativePath(AbsolutePath);
+		public string GitPath => AssetLockUtility.ToGitRelativePath(AbsolutePath);
+		public string UnityMetaPath => $"{UnityPath}.meta";
+		public string Guid => AssetDatabase.AssetPathToGUID(UnityPath);
+		public bool Exists => File.Exists(AbsolutePath);
+		public string Extension => Path.GetExtension(AbsolutePath);
 		public bool ShouldTrack => AssetLockUtility.ShouldTrack(this);
 		public bool Tracked => AssetLockManager.Instance.IsTracked(this);
 		public bool Locked => AssetLockManager.Instance.IsLocked(this);
 		public LockInfo Lock => AssetLockManager.Instance.Repo[this];
 		public DirectoryReference Directory => DirectoryReference.FromFile(this);
-		public FileReference Meta => new FileReference(UnityMetaPath, true);
-		public bool IsMeta => this.AbsolutePath.EndsWith(".meta", StringComparison.OrdinalIgnoreCase);
-		public Object MainAsset => AssetDatabase.LoadMainAssetAtPath(this.UnityPath);
+		public FileReference Meta => new(UnityMetaPath, true);
+		public bool IsMeta => AbsolutePath.EndsWith(".meta", StringComparison.OrdinalIgnoreCase);
+		public Object MainAsset => AssetDatabase.LoadMainAssetAtPath(UnityPath);
 
-		public FileStream OpenRead()
-		{
-			return File.OpenRead(this.AbsolutePath);
-		}
-		
-		public bool TryGetLock(out LockInfo lockInfo)
-		{
-			return AssetLockManager.Instance.Repo.TryGetValue(this, out lockInfo);
-		}
+		public FileStream OpenRead() => File.OpenRead(AbsolutePath);
 
-		public LockInfo ToLock(bool locked = false, string lockId = null, string owner = null, string lockedAt = null)
-		{
-			return new LockInfo()
+		public bool TryGetLock(out LockInfo lockInfo) => AssetLockManager.Instance.Repo.TryGetValue(this, out lockInfo);
+
+		public LockInfo
+			ToLock(bool locked = false, string lockId = null, string owner = null, string lockedAt = null) =>
+			new()
 			{
-				guid = this.Guid,
-				path = this.UnityPath,
-				name = Path.GetFileNameWithoutExtension(this.AbsolutePath),
+				guid = Guid,
+				path = UnityPath,
+				name = Path.GetFileNameWithoutExtension(AbsolutePath),
 				locked = locked,
 				lockId = lockId,
 				owner = owner,
 				lockedAt = lockedAt
 			};
-		}
 
 		public string AsProcessArg()
 		{
@@ -85,175 +72,115 @@ namespace AssetLock.Editor.Data
 
 		public void TrackFile(bool force = false)
 		{
-			if (!force && (!ShouldTrack || Tracked))
-			{
-				return;
-			}
+			if (!force && (!ShouldTrack || Tracked)) return;
 
 			AssetLockManager.Instance.TrackFile(this, force);
 		}
-		
+
 		public async Task TrackFileAsync(bool force = false)
 		{
-			if (!force && (!ShouldTrack || Tracked))
-			{
-				return;
-			}
+			if (!force && (!ShouldTrack || Tracked)) return;
 
 			await AssetLockManager.Instance.TrackFileAsync(this, force);
 		}
 
 		public void UntrackFile(bool force = false)
 		{
-			if (!force && (!ShouldTrack || !Tracked))
-			{
-				return;
-			}
+			if (!force && (!ShouldTrack || !Tracked)) return;
 
 			AssetLockManager.Instance.UntrackFile(this, force);
 		}
-		
+
 		public async Task UntrackFileAsync(bool force = false)
 		{
-			if (!force && (!ShouldTrack || !Tracked))
-			{
-				return;
-			}
+			if (!force && (!ShouldTrack || !Tracked)) return;
 
 			await AssetLockManager.Instance.UntrackFileAsync(this, force);
 		}
 
 		public void LockFile(bool force = false)
 		{
-			if (!force && Locked)
-			{
-				return;
-			}
+			if (!force && Locked) return;
 
 			AssetLockManager.Instance.LockFile(this, force);
 		}
-		
+
 		public async Task LockFileAsync(bool force = false)
 		{
-			if (!force && Locked)
-			{
-				return;
-			}
+			if (!force && Locked) return;
 
 			await AssetLockManager.Instance.LockFileAsync(this, force);
 		}
 
 		public void UnlockFile(bool force = false)
 		{
-			if (!force && !Locked)
-			{
-				return;
-			}
+			if (!force && !Locked) return;
 
 			AssetLockManager.Instance.UnlockFile(this, force);
 		}
-		
+
 		public async Task UnlockFileAsync(bool force = false)
 		{
-			if (!force && !Locked)
-			{
-				return;
-			}
+			if (!force && !Locked) return;
 
 			await AssetLockManager.Instance.UnlockFileAsync(this, force);
 		}
 
 		public void RefreshLock()
 		{
-			if (!Exists)
-			{
-				return;
-			}
+			if (!Exists) return;
 
 			AssetLockManager.Instance.RefreshFile(this);
 		}
-		
+
 		public async Task RefreshLockAsync()
 		{
-			if (!Exists)
-			{
-				return;
-			}
+			if (!Exists) return;
 
 			await AssetLockManager.Instance.RefreshFileAsync(this);
 		}
 
-		public static FileReference FromGuid(string guid)
-		{
-			return new FileReference(AssetDatabase.GUIDToAssetPath(guid), false);
-		}
-		
-		public static FileReference FromPath(string path)
-		{
-			return new FileReference(path, false);
-		}
+		public static FileReference FromGuid(string guid) => new(AssetDatabase.GUIDToAssetPath(guid), false);
 
-		public static FileReference FromPath(string path, bool allowMeta)
-		{
-			return new FileReference(path, allowMeta);
-		}
+		public static FileReference FromPath(string path) => new(path, false);
+
+		public static FileReference FromPath(string path, bool allowMeta) => new(path, allowMeta);
 
 		public static FileReference FromLock(LockInfo lockInfo)
 		{
-			if (!string.IsNullOrWhiteSpace(lockInfo.guid))
-			{
-				return FromGuid(lockInfo.guid);
-			}
+			if (!string.IsNullOrWhiteSpace(lockInfo.guid)) return FromGuid(lockInfo.guid);
 
-			if (!string.IsNullOrWhiteSpace(lockInfo.path))
-			{
-				return FromPath(lockInfo.path);
-			}
+			if (!string.IsNullOrWhiteSpace(lockInfo.path)) return FromPath(lockInfo.path);
 
 			throw new ArgumentException("LockInfo does not contain a valid path or guid.");
 		}
 
-		public static implicit operator FileReference(FileInfo file)
-		{
-			return new FileReference(file.FullName, true);
-		}
+		public static implicit operator FileReference(FileInfo file) => new(file.FullName, true);
 
-		public static implicit operator FileInfo(FileReference file)
-		{
-			return new FileInfo(file.AbsolutePath);
-		}
+		public static implicit operator FileInfo(FileReference file) => new(file.AbsolutePath);
 
 		public override string ToString()
 		{
 			StringBuilder sb = new();
 			sb.AppendLine($"FileReference: {NameWithExtension}");
-			sb.AppendLine($"\tAbsolutePath: {this.AbsolutePath}");
-			sb.AppendLine($"\tGitPath: {this.GitPath}");
-			sb.AppendLine($"\tUnityPath: {this.UnityPath}");
-			sb.AppendLine($"\tAssetPath: {this.AssetPath}");
-			sb.AppendLine($"\tUnityMetaPath: {this.UnityMetaPath}");
-			sb.AppendLine($"\tExists: {this.Exists}");
-			sb.AppendLine($"\tExtension: {this.Extension}");
+			sb.AppendLine($"\tAbsolutePath: {AbsolutePath}");
+			sb.AppendLine($"\tGitPath: {GitPath}");
+			sb.AppendLine($"\tUnityPath: {UnityPath}");
+			sb.AppendLine($"\tAssetPath: {AssetPath}");
+			sb.AppendLine($"\tUnityMetaPath: {UnityMetaPath}");
+			sb.AppendLine($"\tExists: {Exists}");
+			sb.AppendLine($"\tExtension: {Extension}");
 
 			// will throw if the file is not found
-			sb.AppendLine(Exists ? $"\tGuid: {this.Guid}" : "\tGuid: <file not found>");
+			sb.AppendLine(Exists ? $"\tGuid: {Guid}" : "\tGuid: <file not found>");
 
 			return sb.ToString();
 		}
 
-		public override bool Equals(object obj)
-		{
-			return obj is FileReference other && Equals(other);
-		}
+		public override bool Equals(object obj) => obj is FileReference other && Equals(other);
 
-		public override int GetHashCode()
-		{
-			return (AbsolutePath != null ? AbsolutePath.GetHashCode() : 0);
-		}
+		public override int GetHashCode() => AbsolutePath != null ? AbsolutePath.GetHashCode() : 0;
 
-		public bool Equals(FileReference other)
-		{
-			return AbsolutePath == other.AbsolutePath;
-		}
+		public bool Equals(FileReference other) => AbsolutePath == other.AbsolutePath;
 	}
 }

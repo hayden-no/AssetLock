@@ -13,7 +13,7 @@ using UnityEngine;
 using static AssetLock.Editor.AssetLockSettings;
 using Object = UnityEngine.Object;
 
-[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("haydenno.assetlock.tests")]
+[assembly: InternalsVisibleTo("haydenno.assetlock.tests")]
 
 namespace AssetLock.Editor
 {
@@ -74,22 +74,16 @@ namespace AssetLock.Editor
 
 		public static class Logging
 		{
-			const string LOG_PREFIX = "<b><color=cyan>[AssetLock]</color></b> ";
+			private const string LOG_PREFIX = "<b><color=cyan>[AssetLock]</color></b> ";
 
 			[HideInCallstack]
-			static string GetMessage(string message)
-			{
-				return LOG_PREFIX + message;
-			}
+			private static string GetMessage(string message) => LOG_PREFIX + message;
 
-			static bool HasReference(object[] args, out FileReference reference)
+			private static bool HasReference(object[] args, out FileReference reference)
 			{
 				reference = default;
 
-				if (!AddAssetReferenceToLogs)
-				{
-					return false;
-				}
+				if (!AddAssetReferenceToLogs) return false;
 
 				foreach (var arg in args)
 				{
@@ -108,196 +102,136 @@ namespace AssetLock.Editor
 			[HideInCallstack]
 			public static void LogVerbose(string message)
 			{
-				if (DebugMode && VerboseLogging)
-				{
-					UnityEngine.Debug.Log(GetMessage(message));
-				}
+				if (DebugMode && VerboseLogging) UnityEngine.Debug.Log(GetMessage(message));
 			}
 
 			// ReSharper disable Unity.PerformanceAnalysis
 			[HideInCallstack]
 			public static void LogVerbose(Object context, string message)
 			{
-				if (DebugMode && VerboseLogging)
-				{
-					UnityEngine.Debug.Log(GetMessage(message), context);
-				}
+				if (DebugMode && VerboseLogging) UnityEngine.Debug.Log(GetMessage(message), context);
 			}
 
 			// ReSharper disable Unity.PerformanceAnalysis
-			[StringFormatMethod("format")]
-			[HideInCallstack]
+			[StringFormatMethod("format"), HideInCallstack]
 			public static void LogVerboseFormat(string format, params object[] args)
 			{
 				if (DebugMode && VerboseLogging)
 				{
 					if (HasReference(args, out var reference))
-					{
 						LogVerboseFormat(reference.MainAsset, format, args);
-					}
 					else
-					{
 						UnityEngine.Debug.LogFormat(GetMessage(format), args);
-					}
 				}
 			}
 
 			// ReSharper disable Unity.PerformanceAnalysis
-			[StringFormatMethod("format")]
-			[HideInCallstack]
+			[StringFormatMethod("format"), HideInCallstack]
 			public static void LogVerboseFormat(Object context, string format, params object[] args)
 			{
-				if (DebugMode && VerboseLogging)
-				{
-					UnityEngine.Debug.LogFormat(context, GetMessage(format), args);
-				}
+				if (DebugMode && VerboseLogging) UnityEngine.Debug.LogFormat(context, GetMessage(format), args);
 			}
 
 			// ReSharper disable Unity.PerformanceAnalysis
 			[HideInCallstack]
 			public static void Log(string message)
 			{
-				if (InfoLogging)
-				{
-					UnityEngine.Debug.Log(GetMessage(message));
-				}
+				if (InfoLogging) UnityEngine.Debug.Log(GetMessage(message));
 			}
 
 			// ReSharper disable Unity.PerformanceAnalysis
 			[HideInCallstack]
 			public static void Log(Object context, string message)
 			{
-				if (InfoLogging)
-				{
-					UnityEngine.Debug.Log(GetMessage(message), context);
-				}
+				if (InfoLogging) UnityEngine.Debug.Log(GetMessage(message), context);
 			}
 
 			// ReSharper disable Unity.PerformanceAnalysis
-			[StringFormatMethod("format")]
-			[HideInCallstack]
+			[StringFormatMethod("format"), HideInCallstack]
 			public static void LogFormat(string format, params object[] args)
 			{
 				if (InfoLogging)
 				{
 					if (HasReference(args, out var reference))
-					{
 						LogFormat(reference.MainAsset, format, args);
-					}
 					else
-					{
 						UnityEngine.Debug.LogFormat(GetMessage(format), args);
-					}
 				}
 			}
 
 			// ReSharper disable Unity.PerformanceAnalysis
-			[StringFormatMethod("format")]
-			[HideInCallstack]
+			[StringFormatMethod("format"), HideInCallstack]
 			public static void LogFormat(Object context, string format, params object[] args)
 			{
-				if (InfoLogging)
-				{
-					UnityEngine.Debug.LogFormat(context, GetMessage(format), args);
-				}
+				if (InfoLogging) UnityEngine.Debug.LogFormat(context, GetMessage(format), args);
 			}
 
 			// ReSharper disable Unity.PerformanceAnalysis
 			[HideInCallstack]
 			public static void LogWarning(string message)
 			{
-				if (WarningLogging)
-				{
-					UnityEngine.Debug.LogWarning(GetMessage(message));
-				}
+				if (WarningLogging) UnityEngine.Debug.LogWarning(GetMessage(message));
 			}
 
 			// ReSharper disable Unity.PerformanceAnalysis
 			[HideInCallstack]
 			public static void LogWarning(Object context, string message)
 			{
-				if (WarningLogging)
-				{
-					UnityEngine.Debug.LogWarning(GetMessage(message), context);
-				}
+				if (WarningLogging) UnityEngine.Debug.LogWarning(GetMessage(message), context);
 			}
 
 			// ReSharper disable Unity.PerformanceAnalysis
-			[StringFormatMethod("format")]
-			[HideInCallstack]
+			[StringFormatMethod("format"), HideInCallstack]
 			public static void LogWarningFormat(string format, params object[] args)
 			{
 				if (WarningLogging)
 				{
 					if (HasReference(args, out var reference))
-					{
 						LogWarningFormat(reference.MainAsset, format, args);
-					}
 					else
-					{
 						UnityEngine.Debug.LogWarningFormat(GetMessage(format), args);
-					}
 				}
 			}
 
 			// ReSharper disable Unity.PerformanceAnalysis
-			[StringFormatMethod("format")]
-			[HideInCallstack]
+			[StringFormatMethod("format"), HideInCallstack]
 			public static void LogWarningFormat(Object context, string format, params object[] args)
 			{
-				if (WarningLogging)
-				{
-					UnityEngine.Debug.LogWarningFormat(context, GetMessage(format), args);
-				}
+				if (WarningLogging) UnityEngine.Debug.LogWarningFormat(context, GetMessage(format), args);
 			}
 
 			// ReSharper disable Unity.PerformanceAnalysis
 			[HideInCallstack]
 			public static void LogError(string message)
 			{
-				if (ErrorLogging)
-				{
-					UnityEngine.Debug.LogError(GetMessage(message));
-				}
+				if (ErrorLogging) UnityEngine.Debug.LogError(GetMessage(message));
 			}
 
 			// ReSharper disable Unity.PerformanceAnalysis
 			[HideInCallstack]
 			public static void LogError(Object context, string message)
 			{
-				if (ErrorLogging)
-				{
-					UnityEngine.Debug.LogError(GetMessage(message), context);
-				}
+				if (ErrorLogging) UnityEngine.Debug.LogError(GetMessage(message), context);
 			}
 
 			// ReSharper disable Unity.PerformanceAnalysis
-			[StringFormatMethod("format")]
-			[HideInCallstack]
+			[StringFormatMethod("format"), HideInCallstack]
 			public static void LogErrorFormat(string format, params object[] args)
 			{
 				if (ErrorLogging)
 				{
 					if (HasReference(args, out var reference))
-					{
 						LogErrorFormat(reference.MainAsset, format, args);
-					}
 					else
-					{
 						UnityEngine.Debug.LogErrorFormat(GetMessage(format), args);
-					}
 				}
 			}
 
 			// ReSharper disable Unity.PerformanceAnalysis
-			[StringFormatMethod("format")]
-			[HideInCallstack]
+			[StringFormatMethod("format"), HideInCallstack]
 			public static void LogErrorFormat(Object context, string format, params object[] args)
 			{
-				if (ErrorLogging)
-				{
-					UnityEngine.Debug.LogErrorFormat(context, GetMessage(format), args);
-				}
+				if (ErrorLogging) UnityEngine.Debug.LogErrorFormat(context, GetMessage(format), args);
 			}
 
 			public struct Profiler : IDisposable
@@ -322,37 +256,23 @@ namespace AssetLock.Editor
 					m_message = null;
 				}
 
-				public Profiler(string message, [CallerMemberName] string callerName = null)
-					: this(callerName)
-				{
+				public Profiler(string message, [CallerMemberName] string callerName = null) : this(callerName) =>
 					m_message = message;
-				}
 
-				public void SetMessage(string msg)
-				{
-					m_message = msg;
-				}
+				public void SetMessage(string msg) => m_message = msg;
 
 				[StringFormatMethod("format")]
-				public void SetMessageFormat(string format, params object[] args)
-				{
+				public void SetMessageFormat(string format, params object[] args) =>
 					m_message = string.Format(format, args);
-				}
 
 				[HideInCallstack]
 				public void Dispose()
 				{
-					if (string.IsNullOrEmpty(m_name))
-					{
-						return;
-					}
+					if (string.IsNullOrEmpty(m_name)) return;
 
 					m_stopwatch?.Stop();
 
-					if (m_stopwatch?.ElapsedMilliseconds < ProfilingMinTimeMs)
-					{
-						return;
-					}
+					if (m_stopwatch?.ElapsedMilliseconds < ProfilingMinTimeMs) return;
 
 					LogVerboseFormat(
 						"[Profiling] {0} | {1}ms{2}",
@@ -364,10 +284,7 @@ namespace AssetLock.Editor
 			}
 		}
 
-		public enum CredentialsKind
-		{
-			GitHub, GitLab, UserPass,
-		}
+		public enum CredentialsKind { GitHub, GitLab, UserPass }
 
 		private static class ControlChars
 		{
@@ -377,63 +294,47 @@ namespace AssetLock.Editor
 			public const char SUB = (char)26; // Substitute
 		}
 
-		public static bool IsControlChar(char c)
-		{
-			return (c >= ControlChars.NUL && c < ControlChars.BS) || (c > ControlChars.CR && c < (char)32);
-		}
+		public static bool IsControlChar(char c) =>
+			(c >= ControlChars.NUL && c < ControlChars.BS) || (c > ControlChars.CR && c < (char)32);
 
-		public static IEnumerable<FileReference> GetAllBinaryPaths(string[] assetOrMetaFilePaths)
-		{
-			return assetOrMetaFilePaths.Select(FileReference.FromPath).Distinct().Where(ShouldTrack);
-		}
+		public static IEnumerable<FileReference> GetAllBinaryPaths(string[] assetOrMetaFilePaths) =>
+			assetOrMetaFilePaths.Select(FileReference.FromPath).Distinct().Where(ShouldTrack);
 
-		public static bool ShouldTrack(string path)
-		{
-			return ShouldTrack(FileReference.FromPath(path));
-		}
+		public static bool ShouldTrack(string path) => ShouldTrack(FileReference.FromPath(path));
 
 		public static bool ShouldTrack(FileReference info)
 		{
-			if (!info.Exists)
-			{
-				return false;
-			}
+			if (!info.Exists) return false;
 
-			if (!IsTrackedExtension(info))
-			{
-				return false;
-			}
+			if (!IsTrackedExtension(info)) return false;
 
-			if (TrackNonBinaryFiles)
-			{
-				return true;
-			}
+			if (TrackNonBinaryFiles) return true;
 
 			return !IsUnityYaml(info) && IsBinary(info, QuickCheckSize);
 		}
 
 		// https://stackoverflow.com/questions/910873/how-can-i-determine-if-a-file-is-binary-or-text-in-c
-		public static bool IsBinary(FileReference info, long max = Int64.MaxValue)
+		public static bool IsBinary(FileReference info, long max = long.MaxValue)
 		{
 			using (var fs = info.OpenRead())
 			{
 				using (var reader = new StreamReader(fs))
 				{
-					char[] buffer = new char[1024];
+					var buffer = new char[1024];
 
-					long remaining = max;
+					var remaining = max;
+
 					while (remaining > 0)
 					{
-						int read = reader.Read(buffer, 0, (int)Math.Min(buffer.Length, remaining));
+						var read = reader.Read(buffer, 0, (int)Math.Min(buffer.Length, remaining));
+
 						if (read == 0) break;
+
 						remaining -= read;
 
-						for (int i = 0; i < read; i++)
+						for (var i = 0; i < read; i++)
 						{
-							if (IsControlChar(buffer[i]))
-							{
-								return true;
-							}
+							if (IsControlChar(buffer[i])) return true;
 						}
 					}
 				}
@@ -456,27 +357,18 @@ namespace AssetLock.Editor
 				}
 			}
 
-			if (line1 == null || line2 == null)
-			{
-				return false;
-			}
+			if (line1 == null || line2 == null) return false;
 
-			if (line1.Contains("%YAML 1.1") && line2.Contains("%TAG !u! tag:unity3d.com,2011:"))
-			{
-				return true;
-			}
+			if (line1.Contains("%YAML 1.1") && line2.Contains("%TAG !u! tag:unity3d.com,2011:")) return true;
 
 			return false;
 		}
 
-		public static bool IsTrackedExtension(FileReference info)
-		{
-			return TrackedFileEndings.value.Contains(info.Extension);
-		}
+		public static bool IsTrackedExtension(FileReference info) => TrackedFileEndings.value.Contains(info.Extension);
 
 		public static bool TryGetDefaultGitPath(out string path)
 		{
-			string[] paths = Constants.PATH.Split(';');
+			var paths = Constants.PATH.Split(';');
 			path = paths.Select(x => Path.Combine(x, Constants.DEFAULT_GIT_EXE)).FirstOrDefault(File.Exists);
 
 			return path != null;
@@ -484,7 +376,7 @@ namespace AssetLock.Editor
 
 		public static bool TryGetDefaultGitLfsPath(out string path)
 		{
-			string[] paths = Constants.PATH.Split(';');
+			var paths = Constants.PATH.Split(';');
 			path = paths.Select(x => Path.Combine(x, Constants.DEFAULT_GIT_LFS_EXE)).FirstOrDefault(File.Exists);
 
 			return path != null;
@@ -492,10 +384,7 @@ namespace AssetLock.Editor
 
 		public static string GetDefaultLfsEndpoint(string remoteUrl)
 		{
-			if (string.IsNullOrWhiteSpace(remoteUrl))
-			{
-				return string.Empty;
-			}
+			if (string.IsNullOrWhiteSpace(remoteUrl)) return string.Empty;
 
 			if (remoteUrl.StartsWith("http"))
 			{
@@ -544,16 +433,13 @@ namespace AssetLock.Editor
 		{
 			endpointUrl = string.Empty;
 
-			int from = env.IndexOf(Constants.GIT_LFS_ENV_ENDPOINT, StringComparison.OrdinalIgnoreCase);
+			var from = env.IndexOf(Constants.GIT_LFS_ENV_ENDPOINT, StringComparison.OrdinalIgnoreCase);
 
-			if (from == -1)
-			{
-				return false;
-			}
+			if (from == -1) return false;
 
-			int to1 = env.IndexOf(" ", from, StringComparison.OrdinalIgnoreCase);
-			int to2 = env.IndexOf("\n", from, StringComparison.OrdinalIgnoreCase);
-			int to = to1 == -1 ? to2 : to2 == -1 ? to1 : Math.Min(to1, to2);
+			var to1 = env.IndexOf(" ", from, StringComparison.OrdinalIgnoreCase);
+			var to2 = env.IndexOf("\n", from, StringComparison.OrdinalIgnoreCase);
+			var to = to1 == -1 ? to2 : to2 == -1 ? to1 : Math.Min(to1, to2);
 			if (to == -1) to = env.Length;
 
 			from += Constants.GIT_LFS_ENV_ENDPOINT.Length;
@@ -567,19 +453,13 @@ namespace AssetLock.Editor
 		{
 			workingDir = string.Empty;
 
-			int from = env.IndexOf(Constants.GIT_LFS_ENV_WORKING_DIR, StringComparison.OrdinalIgnoreCase);
+			var from = env.IndexOf(Constants.GIT_LFS_ENV_WORKING_DIR, StringComparison.OrdinalIgnoreCase);
 
-			if (from == -1)
-			{
-				return false;
-			}
+			if (from == -1) return false;
 
 			from += Constants.GIT_LFS_ENV_WORKING_DIR.Length;
-			int to = env.IndexOf('\n', from);
-			if (to == -1)
-			{
-				to = env.Length;
-			}
+			var to = env.IndexOf('\n', from);
+			if (to == -1) to = env.Length;
 
 			workingDir = env.Substring(from, to - from).TrimEnd('\r');
 
@@ -588,10 +468,7 @@ namespace AssetLock.Editor
 
 		public static string NormalizePath(string path)
 		{
-			if (string.IsNullOrWhiteSpace(path))
-			{
-				return string.Empty;
-			}
+			if (string.IsNullOrWhiteSpace(path)) return string.Empty;
 
 			path = Path.GetFullPath(path);
 
@@ -600,77 +477,68 @@ namespace AssetLock.Editor
 
 		public static string NormalizePathOrThrow(string path)
 		{
-			if (string.IsNullOrWhiteSpace(path))
-			{
-				throw new Exception("Path is null or empty.");
-			}
+			if (string.IsNullOrWhiteSpace(path)) throw new Exception("Path is null or empty.");
 
 			path = Path.GetFullPath(path);
 
 			return GetPathWithoutMeta(path);
 		}
 
-		public static string ToUnityRelativePath(string path)
-		{
-			return Path.GetRelativePath(Path.Combine(Application.dataPath, "..\\"), path);
-		}
+		public static string ToUnityRelativePath(string path) =>
+			Path.GetRelativePath(Path.Combine(Application.dataPath, "..\\"), path);
 
-		public static string ToUnityAssetsRelativePath(string path)
-		{
-			return Path.GetRelativePath(Application.dataPath, path);
-		}
+		public static string ToUnityAssetsRelativePath(string path) => Path.GetRelativePath(Application.dataPath, path);
 
-		public static string ToGitRelativePath(string path)
-		{
-			return Path.GetRelativePath(GitWorkingDirectory, path);
-		}
+		public static string ToGitRelativePath(string path) => Path.GetRelativePath(GitWorkingDirectory, path);
 
 		public static string GetFullPath(string path)
 		{
-			if (Path.IsPathRooted(path))
-			{
-				return Path.GetFullPath(path);
-			}
+			if (Path.IsPathRooted(path)) return Path.GetFullPath(path);
 
 			var instance = AssetLockManager.Instance;
 			var gitDirectory = instance?.GitWorkingDirectoryReference.AbsolutePath;
+
 			if (!string.IsNullOrEmpty(gitDirectory) && StartsWithDirectory(path, Path.GetFileName(gitDirectory)))
-			{
 				return Path.GetFullPath(Path.Combine(Directory.GetParent(gitDirectory).FullName, path));
-			}
 
 			var dataDirectory = Path.GetFullPath(Application.dataPath);
 			var projectDirectory = Directory.GetParent(dataDirectory).FullName;
+
 			if (StartsWithDirectory(path, Path.GetFileName(projectDirectory)))
-			{
 				return Path.GetFullPath(Path.Combine(Directory.GetParent(projectDirectory).FullName, path));
-			}
 
 			if (StartsWithDirectory(path, Path.GetFileName(dataDirectory)) || StartsWithDirectory(path, "Packages"))
-			{
 				return Path.GetFullPath(Path.Combine(projectDirectory, path));
-			}
-			
-			Logging.LogErrorFormat("Could not determine the full path for {0}.\nUnityProj: {1}\nUnityData: {2}", path, projectDirectory, dataDirectory);
+
+			Logging.LogErrorFormat(
+				"Could not determine the full path for {0}.\nUnityProj: {1}\nUnityData: {2}",
+				path,
+				projectDirectory,
+				dataDirectory
+			);
 
 			return string.Empty;
 		}
 
 		private static bool StartsWithDirectory(string path, string directoryName)
 		{
-			var comparison = Path.DirectorySeparatorChar == '\\' ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-			return !string.IsNullOrEmpty(directoryName) && path.StartsWith(directoryName, comparison) &&
-			       (path.Length == directoryName.Length || path[directoryName.Length] == '/' || path[directoryName.Length] == '\\');
+			var comparison = Path.DirectorySeparatorChar == '\\'
+				? StringComparison.OrdinalIgnoreCase
+				: StringComparison.Ordinal;
+
+			return !string.IsNullOrEmpty(directoryName) &&
+				path.StartsWith(directoryName, comparison) &&
+				(path.Length == directoryName.Length ||
+					path[directoryName.Length] == '/' ||
+					path[directoryName.Length] == '\\');
 		}
 
-		public static string GetPathWithoutMeta(string path)
-		{
-			return path.EndsWith(".meta") ? path.Substring(0, path.Length - 5) : path;
-		}
+		public static string GetPathWithoutMeta(string path) =>
+			path.EndsWith(".meta") ? path.Substring(0, path.Length - 5) : path;
 
 		public static List<LockInfo> FromJson(string json)
 		{
-			List<LockInfo> locks = new List<LockInfo>();
+			var locks = new List<LockInfo>();
 
 			foreach (var l in JsonConvert.DeserializeObject<List<LocksResponseDataJson>>(json))
 			{
@@ -680,21 +548,13 @@ namespace AssetLock.Editor
 			return locks;
 		}
 
-		public static bool IsGitHubUrl(string url)
-		{
-			return HasHost(url, "github.com");
-		}
+		public static bool IsGitHubUrl(string url) => HasHost(url, "github.com");
 
-		public static bool IsGitLabUrl(string url)
-		{
-			return HasHost(url, "gitlab.com");
-		}
+		public static bool IsGitLabUrl(string url) => HasHost(url, "gitlab.com");
 
-		private static bool HasHost(string url, string host)
-		{
-			return Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
-			       (string.Equals(uri.Host, host, StringComparison.OrdinalIgnoreCase) ||
-			        uri.Host.EndsWith("." + host, StringComparison.OrdinalIgnoreCase));
-		}
+		private static bool HasHost(string url, string host) =>
+			Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
+			(string.Equals(uri.Host, host, StringComparison.OrdinalIgnoreCase) ||
+				uri.Host.EndsWith("." + host, StringComparison.OrdinalIgnoreCase));
 	}
 }

@@ -31,18 +31,17 @@ namespace AssetLock.Editor
 		{
 			using var profiler = new Logging.Profiler(message: string.Join('\n', assetOrMetaFilePaths));
 
-			if (!IsActive)
-			{
-				return true;
-			}
+			if (!IsActive) return true;
+
 			if (WarnOnly)
 			{
 				WarnForPaths(assetOrMetaFilePaths, "open", false);
+
 				return true;
 			}
 
 			HandleRefresh(statusQueryOptions);
-			bool result = true;
+			var result = true;
 
 			foreach (var path in GetAllBinaryPaths(assetOrMetaFilePaths))
 			{
@@ -59,12 +58,10 @@ namespace AssetLock.Editor
 			}
 
 			if (outNotEditablePaths.Count > 0)
-			{
 				Logging.LogWarningFormat(
 					"Cannot open for edit the following locked assets: {0}",
 					string.Join(", ", outNotEditablePaths)
 				);
-			}
 
 			return result;
 		}
@@ -77,18 +74,17 @@ namespace AssetLock.Editor
 		{
 			using var profiler = new Logging.Profiler(message: string.Join('\n', assetOrMetaFilePaths));
 
-			if (!IsActive)
-			{
-				return true;
-			}
+			if (!IsActive) return true;
+
 			if (WarnOnly)
 			{
 				WarnForPaths(assetOrMetaFilePaths, "edit", true);
+
 				return true;
 			}
 
 			HandleRefresh(statusQueryOptions);
-			bool result = true;
+			var result = true;
 
 			foreach (var path in GetAllBinaryPaths(assetOrMetaFilePaths))
 			{
@@ -111,18 +107,17 @@ namespace AssetLock.Editor
 		{
 			using var profiler = new Logging.Profiler(message: string.Join('\n', paths));
 
-			if (!IsActive)
-			{
-				return true;
-			}
+			if (!IsActive) return true;
+
 			if (WarnOnly)
 			{
 				WarnForPaths(paths, "edit", true, true);
+
 				return true;
 			}
 
 			HandleRefresh(StatusQueryOptions.UseCachedIfPossible);
-			bool result = true;
+			var result = true;
 
 			foreach (var path in GetAllBinaryPaths(paths))
 			{
@@ -150,43 +145,34 @@ namespace AssetLock.Editor
 		{
 			using var profiler = new Logging.Profiler(message: string.Join('\n', paths));
 
-			if (!IsActive)
-			{
-				return paths;
-			}
+			if (!IsActive) return paths;
+
 			if (WarnOnly)
 			{
 				WarnForPaths(paths, "save", true, true);
+
 				return paths;
 			}
 
 			HandleRefresh(StatusQueryOptions.UseCachedIfPossible);
-			HashSet<FileReference> unsaved = new HashSet<FileReference>();
+			var unsaved = new HashSet<FileReference>();
 
 			foreach (var path in GetAllBinaryPaths(paths))
 			{
 				if (!GetLock(path, true, out var info))
-				{
 					unsaved.Add(path);
-				}
 				else if (info is { locked: true, LockedByMe: false })
-				{
 					unsaved.Add(path);
-				}
-				else if (!TryAutoLock(info, true, "save"))
-				{
-					unsaved.Add(path);
-				}
+				else if (!TryAutoLock(info, true, "save")) unsaved.Add(path);
 			}
 
 			if (unsaved.Any())
-			{
-				Logging.LogWarningFormat("Unsaved assets: {0}", string.Join(", ", unsaved.Select(file => file.UnityPath)));
-			}
+				Logging.LogWarningFormat(
+					"Unsaved assets: {0}",
+					string.Join(", ", unsaved.Select(file => file.UnityPath))
+				);
 			else
-			{
 				return paths;
-			}
 
 			return paths.Where(path => !unsaved.Contains(FileReference.FromPath(path))).ToArray();
 		}
@@ -195,23 +181,19 @@ namespace AssetLock.Editor
 		{
 			using var profiler = new Logging.Profiler(message: assetPath);
 
-			if (!IsActive)
-			{
-				return AssetDeleteResult.DidNotDelete;
-			}
+			if (!IsActive) return AssetDeleteResult.DidNotDelete;
+
 			if (WarnOnly)
 			{
 				WarnForPaths(new[] { assetPath }, "delete", true, true);
+
 				return AssetDeleteResult.DidNotDelete;
 			}
 
 			HandleRefresh(StatusQueryOptions.UseCachedIfPossible);
 			var path = FileReference.FromPath(assetPath);
 
-			if (!ShouldTrack(path))
-			{
-				return AssetDeleteResult.DidNotDelete;
-			}
+			if (!ShouldTrack(path)) return AssetDeleteResult.DidNotDelete;
 
 			if (!GetLock(path, true, out var info))
 			{
@@ -240,23 +222,19 @@ namespace AssetLock.Editor
 		{
 			using var profiler = new Logging.Profiler(message: sourcePath);
 
-			if (!IsActive)
-			{
-				return AssetMoveResult.DidNotMove;
-			}
+			if (!IsActive) return AssetMoveResult.DidNotMove;
+
 			if (WarnOnly)
 			{
 				WarnForPaths(new[] { sourcePath }, "move", true, true);
+
 				return AssetMoveResult.DidNotMove;
 			}
 
 			HandleRefresh(StatusQueryOptions.UseCachedIfPossible);
 			var path = FileReference.FromPath(sourcePath);
 
-			if (!path.ShouldTrack)
-			{
-				return AssetMoveResult.DidNotMove;
-			}
+			if (!path.ShouldTrack) return AssetMoveResult.DidNotMove;
 
 			if (!GetLock(path, true, out var info))
 			{
@@ -287,21 +265,13 @@ namespace AssetLock.Editor
 		{
 			using var profiler = new Logging.Profiler(message: string.Join('\n', paths));
 
-			if (!IsActive || AssetLockManager.Instance.AutomaticRefreshPaused)
-			{
-				return;
-			}
+			if (!IsActive || AssetLockManager.Instance.AutomaticRefreshPaused) return;
 
 			foreach (var path in GetAllBinaryPaths(paths))
 			{
 				if ((mode & FileMode.Text) != 0)
-				{
 					path.UnlockFile();
-				}
-				else if ((mode & FileMode.Binary) != 0)
-				{
-					path.TrackFile();
-				}
+				else if ((mode & FileMode.Binary) != 0) path.TrackFile();
 
 				LogReferenceVerboseFormat(path, "File mode changed for {0} to {1}", path, mode);
 			}
@@ -309,28 +279,19 @@ namespace AssetLock.Editor
 
 		private static void OnStatusUpdated()
 		{
-			if (!IsActive)
-			{
-				return;
-			}
+			if (!IsActive) return;
 
 			AssetLockManager.Instance.RequestAutomaticRefresh();
 		}
 
 		private static bool GetLock(FileReference reference, bool blocking, out LockInfo info)
 		{
-			if (reference.TryGetLock(out info))
-			{
-				return true;
-			}
+			if (reference.TryGetLock(out info)) return true;
 			if (AssetLockManager.Instance.AutomaticRefreshPaused) return false;
 
 			if (blocking)
 			{
-				if (!reference.TrackFileAsync().Wait(Constants.DEFAULT_LOCK_TIMEOUT))
-				{
-					return false;
-				}
+				if (!reference.TrackFileAsync().Wait(Constants.DEFAULT_LOCK_TIMEOUT)) return false;
 
 				return GetLock(reference, false, out info);
 			}
@@ -345,20 +306,28 @@ namespace AssetLock.Editor
 		private static void WarnForPaths(string[] paths, string action, bool requireOwned, bool autoLock = false)
 		{
 			AssetLockManager.Instance.RequestAutomaticRefresh();
+
 			foreach (var file in GetAllBinaryPaths(paths))
 			{
-				bool known = file.TryGetLock(out var info);
+				var known = file.TryGetLock(out var info);
+
 				if (known && info.LockedByMe)
 				{
 					s_autoLockTimes.Remove(file.AbsolutePath);
+
 					continue;
 				}
+
 				if (autoLock && AutoLock && !s_autoLockPending.Contains(file.AbsolutePath))
 				{
-					double now = EditorApplication.timeSinceStartup;
-					if (s_autoLockTimes.TryGetValue(file.AbsolutePath, out var lastAttempt) && now - lastAttempt < 15) continue;
+					var now = EditorApplication.timeSinceStartup;
+
+					if (s_autoLockTimes.TryGetValue(file.AbsolutePath, out var lastAttempt) && now - lastAttempt < 15)
+						continue;
+
 					if (s_autoLockTimes.Count >= 1024) s_autoLockTimes.Clear();
 					s_autoLockTimes[file.AbsolutePath] = now;
+
 					if (AssetLockManager.Instance.AutomaticRefreshPaused)
 					{
 						AutoLockCompleted(file, "Lock refresh is paused. Check credentials and refresh to retry.");
@@ -376,7 +345,9 @@ namespace AssetLock.Editor
 		{
 			s_autoLockPending.Remove(file.AbsolutePath);
 			InternalEditorUtility.RepaintAllViews();
+
 			if (failure == null || SuppressAutoLockFailureDialogs || Application.isBatchMode || TestMode) return;
+
 			s_dialogFailures[file.UnityPath] = failure;
 			EditorApplication.delayCall -= ShowAutoLockFailures;
 			EditorApplication.delayCall += ShowAutoLockFailures;
@@ -385,25 +356,28 @@ namespace AssetLock.Editor
 		private static void ShowAutoLockFailures()
 		{
 			if (s_dialogFailures.Count == 0) return;
+
 			var details = string.Join("\n", s_dialogFailures.Select(pair => $"{pair.Key}: {pair.Value}"));
 			s_dialogFailures.Clear();
+
 			if (SuppressAutoLockFailureDialogs) return;
-			if (EditorUtility.DisplayDialogComplex("AssetLock: Automatic Lock Failed",
-			    "Editing is allowed, but these files could not be locked:\n\n" + details, "OK", "Don't show again", "") == 1)
+
+			if (EditorUtility.DisplayDialogComplex(
+					"AssetLock: Automatic Lock Failed",
+					"Editing is allowed, but these files could not be locked:\n\n" + details,
+					"OK",
+					"Don't show again",
+					""
+				) ==
+				1)
 				SuppressAutoLockFailureDialogs.SetValue(true);
 		}
 
 		private static bool TryAutoLock(FileReference reference, bool blocking = true, string action = "modify")
 		{
-			if (!IsActive)
-			{
-				return false;
-			}
+			if (!IsActive) return false;
 
-			if (reference.TryGetLock(out var current) && current.LockedByMe)
-			{
-				return true;
-			}
+			if (reference.TryGetLock(out var current) && current.LockedByMe) return true;
 			if (AssetLockManager.Instance.AutomaticRefreshPaused) return false;
 
 			if (AutoLock)
@@ -415,10 +389,9 @@ namespace AssetLock.Editor
 				else
 				{
 					if (!reference.LockFileAsync().Wait(Constants.DEFAULT_LOCK_TIMEOUT) ||
-					    !reference.TryGetLock(out var acquired) || !acquired.LockedByMe)
-					{
+						!reference.TryGetLock(out var acquired) ||
+						!acquired.LockedByMe)
 						return false;
-					}
 				}
 
 				LogReferenceFormat(
@@ -469,39 +442,27 @@ namespace AssetLock.Editor
 		private static void LogReferenceFormat(FileReference reference, string format, params object[] args)
 		{
 			if (AddAssetReferenceToLogs)
-			{
 				Logging.LogFormat(reference.MainAsset, format, args);
-			}
 			else
-			{
 				Logging.LogFormat(format, args);
-			}
 		}
 
 		[StringFormatMethod("format")]
 		private static void LogReferenceVerboseFormat(FileReference reference, string format, params object[] args)
 		{
 			if (AddAssetReferenceToLogs)
-			{
 				Logging.LogVerboseFormat(reference.MainAsset, format, args);
-			}
 			else
-			{
 				Logging.LogVerboseFormat(format, args);
-			}
 		}
 
 		[StringFormatMethod("format")]
 		private static void LogReferenceWarningFormat(FileReference reference, string format, params object[] args)
 		{
 			if (AddAssetReferenceToLogs)
-			{
 				Logging.LogWarningFormat(reference.MainAsset, format, args);
-			}
 			else
-			{
 				Logging.LogWarningFormat(format, args);
-			}
 		}
 	}
 
@@ -512,24 +473,34 @@ namespace AssetLock.Editor
 
 		internal static string GetWarning(FileReference file)
 		{
-			if (!MasterEnable || !WarnOnly || AssetLockManager.Instance?.IsReady != true || !ShouldTrack(file)) return null;
+			if (!MasterEnable || !WarnOnly || AssetLockManager.Instance?.IsReady != true || !ShouldTrack(file))
+				return null;
 			if (!file.TryGetLock(out var info))
-				return AssetLockManager.Instance.AutomaticRefreshPaused ? "Lock status is unavailable because refresh is paused." : "Lock status is not yet available.";
+				return AssetLockManager.Instance.AutomaticRefreshPaused
+					? "Lock status is unavailable because refresh is paused."
+					: "Lock status is not yet available.";
 			if (info.LockedByMe) return null;
-			return info.locked ? $"Locked by {info.owner ?? "another user"}. Editing is allowed in warning mode." : "Not locked by you. Editing is allowed in warning mode.";
+
+			return info.locked
+				? $"Locked by {info.owner ?? "another user"}. Editing is allowed in warning mode."
+				: "Not locked by you. Editing is allowed in warning mode.";
 		}
 
 		private static void Draw(UnityEditor.Editor editor)
 		{
 			if (!MasterEnable || !WarnOnly || AssetLockManager.Instance?.IsReady != true) return;
+
 			var paths = new HashSet<string>();
+
 			foreach (var target in editor.targets)
 			{
 				if (target == null || target is Component) continue;
+
 				var path = AssetDatabase.GetAssetPath(target);
 				if (string.IsNullOrEmpty(path) && target is GameObject gameObject) path = gameObject.scene.path;
 				if (!string.IsNullOrEmpty(path)) paths.Add(path);
 			}
+
 			foreach (var path in paths)
 			{
 				var message = GetWarning(FileReference.FromPath(path));

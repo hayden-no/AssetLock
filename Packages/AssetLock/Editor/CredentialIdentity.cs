@@ -19,32 +19,55 @@ namespace AssetLock.Editor
 	{
 		internal const string SharedKey = Constants.PACKAGE_NAME + ".SavedCredentialIdentities";
 		private const string CurrentKey = "CurrentCredentialIdentity";
-		private static UnityEditor.SettingsManagement.ISettingsRepository Repository => UserSettings.GetRepository(SettingsScope.User);
+
+		private static UnityEditor.SettingsManagement.ISettingsRepository Repository =>
+			UserSettings.GetRepository(SettingsScope.User);
 
 		internal static CredentialIdentity Current
 		{
 			get => Read<CredentialIdentity>(ProjectUserKey(CurrentKey)) ?? new CredentialIdentity();
-			set => Repository.Set(ProjectUserKey(CurrentKey), JsonConvert.SerializeObject(value ?? new CredentialIdentity()));
+			set =>
+				Repository.Set(
+					ProjectUserKey(CurrentKey),
+					JsonConvert.SerializeObject(value ?? new CredentialIdentity())
+				);
 		}
 
-		internal static List<CredentialIdentity> Saved => Read<List<CredentialIdentity>>(SharedKey) ?? new List<CredentialIdentity>();
+		internal static List<CredentialIdentity> Saved =>
+			Read<List<CredentialIdentity>>(SharedKey) ?? new List<CredentialIdentity>();
 
-		private static T Read<T>(string key) where T : class
+		private static T Read<T>(string key)
+			where T : class
 		{
-			string json = Repository.Get(key, string.Empty);
+			var json = Repository.Get(key, string.Empty);
+
 			if (string.IsNullOrEmpty(json)) return null;
-			try { return JsonConvert.DeserializeObject<T>(json); }
-			catch (JsonException) { return null; }
+
+			try
+			{
+				return JsonConvert.DeserializeObject<T>(json);
+			}
+			catch (JsonException)
+			{
+				return null;
+			}
 		}
 
 		internal static void SaveProfile(CredentialIdentity identity)
 		{
-			if (string.IsNullOrWhiteSpace(identity?.Name) || string.IsNullOrWhiteSpace(identity.Username) || string.IsNullOrWhiteSpace(identity.Authority))
-				throw new InvalidOperationException("Enter a profile name, account username, and a valid LFS server URL first.");
+			if (string.IsNullOrWhiteSpace(identity?.Name) ||
+				string.IsNullOrWhiteSpace(identity.Username) ||
+				string.IsNullOrWhiteSpace(identity.Authority))
+				throw new InvalidOperationException(
+					"Enter a profile name, account username, and a valid LFS server URL first."
+				);
+
 			var saved = Saved;
-			int index = saved.FindIndex(p => string.Equals(p.Name, identity.Name, StringComparison.OrdinalIgnoreCase));
-			if (index < 0) saved.Add(identity);
-			else saved[index] = identity;
+			var index = saved.FindIndex(p => string.Equals(p.Name, identity.Name, StringComparison.OrdinalIgnoreCase));
+			if (index < 0)
+				saved.Add(identity);
+			else
+				saved[index] = identity;
 			Repository.Set(SharedKey, JsonConvert.SerializeObject(saved));
 		}
 
@@ -58,8 +81,10 @@ namespace AssetLock.Editor
 		internal static string AuthorityOf(string url)
 		{
 			if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
-			    (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp) || !string.IsNullOrEmpty(uri.UserInfo))
+				(uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp) ||
+				!string.IsNullOrEmpty(uri.UserInfo))
 				return string.Empty;
+
 			return uri.GetLeftPart(UriPartial.Authority);
 		}
 	}

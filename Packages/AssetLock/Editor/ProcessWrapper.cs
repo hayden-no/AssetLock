@@ -28,8 +28,8 @@ namespace AssetLock.Editor
 		public const int PROCESS_TIMEOUT_MS = 5000;
 		internal const int REMOTE_PROCESS_TIMEOUT_MS = 120000;
 
-		internal static bool IsRemoteCommand(string[] args) => args.Length > 0 &&
-			(args[0] == "locks" || args[0] == "lock" || args[0] == "unlock");
+		internal static bool IsRemoteCommand(string[] args) =>
+			args.Length > 0 && (args[0] == "locks" || args[0] == "lock" || args[0] == "unlock");
 
 		public readonly string ExePath;
 		public string WorkingPath { get; set; } = Environment.CurrentDirectory;
@@ -42,8 +42,8 @@ namespace AssetLock.Editor
 
 		private static StringDictionary GetAllEnvVars()
 		{
-			IDictionary envVars = Environment.GetEnvironmentVariables(EnvironmentVariableTarget.Machine);
-			StringDictionary envVarsDict = new StringDictionary();
+			var envVars = Environment.GetEnvironmentVariables(EnvironmentVariableTarget.Machine);
+			var envVarsDict = new StringDictionary();
 
 			foreach (DictionaryEntry entry in envVars)
 			{
@@ -55,18 +55,13 @@ namespace AssetLock.Editor
 			foreach (DictionaryEntry entry in envVars)
 			{
 				if (!envVarsDict.ContainsKey((string)entry.Key))
-				{
 					envVarsDict.Add((string)entry.Key, (string)entry.Value);
-				}
 			}
 
 			return envVarsDict;
 		}
 
-		public ProcessWrapper(string exePath)
-		{
-			ExePath = exePath;
-		}
+		public ProcessWrapper(string exePath) => ExePath = exePath;
 
 		public ProcessResult RunCommand(params string[] args)
 		{
@@ -98,10 +93,7 @@ namespace AssetLock.Editor
 			return result;
 		}
 
-		public async Task<ProcessResult> RunCommandAsync(params string[] args)
-		{
-			return await RunCommandAsync(default, args);
-		}
+		public async Task<ProcessResult> RunCommandAsync(params string[] args) => await RunCommandAsync(default, args);
 
 		public async Task<ProcessResult> RunCommandAsync(CancellationToken ct, params string[] args)
 		{
@@ -135,25 +127,14 @@ namespace AssetLock.Editor
 			return result;
 		}
 
-		private static string[] ProcessArgs(string[] args)
-		{
-			return args.Where(s => !string.IsNullOrWhiteSpace(s)).ToArray();
-		}
+		private static string[] ProcessArgs(string[] args) => args.Where(s => !string.IsNullOrWhiteSpace(s)).ToArray();
 
-		private bool IsSameCommand(string[] args)
-		{
-			return LastCommand == string.Join(" ", args);
-		}
+		private bool IsSameCommand(string[] args) => LastCommand == string.Join(" ", args);
 
-		private int TimeSinceLastRun()
-		{
-			return Math.Abs((int)(DateTime.Now - LastRun).TotalMilliseconds);
-		}
+		private int TimeSinceLastRun() => Math.Abs((int)(DateTime.Now - LastRun).TotalMilliseconds);
 
-		private bool ShouldRunAgain(string[] args)
-		{
-			return !IsSameCommand(args) || m_lastResult.ExitCode != 0 || TimeSinceLastRun() > PROCESS_TIMEOUT_MS;
-		}
+		private bool ShouldRunAgain(string[] args) =>
+			!IsSameCommand(args) || m_lastResult.ExitCode != 0 || TimeSinceLastRun() > PROCESS_TIMEOUT_MS;
 	}
 
 	/// <summary>
@@ -177,15 +158,10 @@ namespace AssetLock.Editor
 			StdErr = stdErr;
 		}
 
-		public override string ToString()
-		{
-			return StdOut;
-		}
+		public override string ToString() => StdOut;
 
-		public string ToDebugString()
-		{
-			return $"Args: {string.Join(' ', ArgsIn)}\nExitCode: {ExitCode}\nStdOut: {StdOut}\nStdErr: {StdErr}";
-		}
+		public string ToDebugString() =>
+			$"Args: {string.Join(' ', ArgsIn)}\nExitCode: {ExitCode}\nStdOut: {StdOut}\nStdErr: {StdErr}";
 	}
 
 	/// <summary>
@@ -194,8 +170,8 @@ namespace AssetLock.Editor
 	internal class ProcessInstance : IDisposable
 	{
 		private readonly Process m_process;
-		private readonly StringBuilder m_stdOut = new StringBuilder();
-		private readonly StringBuilder m_stdErr = new StringBuilder();
+		private readonly StringBuilder m_stdOut = new();
+		private readonly StringBuilder m_stdErr = new();
 		public int Timeout { get; set; } = ProcessWrapper.PROCESS_TIMEOUT_MS;
 
 		private ProcessInstance(string exePath, string workingPath, params string[] args)
@@ -231,18 +207,26 @@ namespace AssetLock.Editor
 
 		internal static ProcessResult Run(string exePath, string workingPath, params string[] args)
 		{
-			using ProcessInstance instance = new ProcessInstance(exePath, workingPath, args);
+			using var instance = new ProcessInstance(exePath, workingPath, args);
 
 			instance.StartProcess();
+
 			if (!instance.m_process.WaitForExit(instance.Timeout))
 			{
-				try { instance.m_process.Kill(); } catch (InvalidOperationException) { }
+				try
+				{
+					instance.m_process.Kill();
+				}
+				catch (InvalidOperationException) { }
+
 				instance.m_process.WaitForExit(1000);
+
 				return new ProcessResult(args, -1, instance.m_stdOut.ToString(), "Process timed out.");
 			}
+
 			instance.m_process.WaitForExit(); // Drain redirected output callbacks.
 
-			int exitCode = -1;
+			var exitCode = -1;
 
 			try
 			{
@@ -268,28 +252,38 @@ namespace AssetLock.Editor
 		)
 		{
 			using var timeout = ct == CancellationToken.None
-				? new CancellationTokenSource(ProcessWrapper.IsRemoteCommand(args)
-					? ProcessWrapper.REMOTE_PROCESS_TIMEOUT_MS : ProcessWrapper.PROCESS_TIMEOUT_MS)
+				? new CancellationTokenSource(
+					ProcessWrapper.IsRemoteCommand(args)
+						? ProcessWrapper.REMOTE_PROCESS_TIMEOUT_MS
+						: ProcessWrapper.PROCESS_TIMEOUT_MS
+				)
 				: null;
 			if (timeout != null) ct = timeout.Token;
 
-			using ProcessInstance instance = new ProcessInstance(exePath, workingPath, args);
+			using var instance = new ProcessInstance(exePath, workingPath, args);
 
 			instance.StartProcess();
+
 			try
 			{
 				await WaitForExitAsync(instance.m_process, ct);
 			}
 			catch (OperationCanceledException)
 			{
-				try { if (!instance.m_process.HasExited) instance.m_process.Kill(); }
+				try
+				{
+					if (!instance.m_process.HasExited) instance.m_process.Kill();
+				}
 				catch (InvalidOperationException) { }
+
 				instance.m_process.WaitForExit(1000);
+
 				throw;
 			}
+
 			instance.m_process.WaitForExit(); // Drain redirected output callbacks.
 
-			int exitCode = -1;
+			var exitCode = -1;
 
 			try
 			{
@@ -309,7 +303,7 @@ namespace AssetLock.Editor
 
 		private static void SetEnvVars(ProcessStartInfo info, params KeyValuePair<string, string>[] vars)
 		{
-			foreach (KeyValuePair<string, string> kvp in vars)
+			foreach (var kvp in vars)
 			{
 				info.EnvironmentVariables[kvp.Key] = kvp.Value;
 			}
@@ -317,39 +311,27 @@ namespace AssetLock.Editor
 
 		private static void SetArgs(ProcessStartInfo info, params string[] args)
 		{
-			foreach (string arg in args)
+			foreach (var arg in args)
 			{
 				info.ArgumentList.Add(arg);
 			}
 		}
 
-		private void OnErrorDataReceived(object sender, DataReceivedEventArgs e)
-		{
-			m_stdErr.AppendLine(e.Data);
-		}
+		private void OnErrorDataReceived(object sender, DataReceivedEventArgs e) => m_stdErr.AppendLine(e.Data);
 
-		private void OnOutputDataReceived(object sender, DataReceivedEventArgs e)
-		{
-			m_stdOut.AppendLine(e.Data);
-		}
+		private void OnOutputDataReceived(object sender, DataReceivedEventArgs e) => m_stdOut.AppendLine(e.Data);
 
 		/// <inheritdoc />
-		public void Dispose()
-		{
-			m_process.Dispose();
-		}
+		public void Dispose() => m_process.Dispose();
 
 		private static Task WaitForExitAsync(Process process, CancellationToken cancellationToken = default)
 		{
 			if (process.HasExited) return Task.CompletedTask;
 
-			TaskCompletionSource<object> tcs = new TaskCompletionSource<object>();
+			var tcs = new TaskCompletionSource<object>();
 			process.EnableRaisingEvents = true;
 			process.Exited += (sender, args) => tcs.TrySetResult(null);
-			if (cancellationToken != new CancellationToken())
-			{
-				cancellationToken.Register(() => tcs.TrySetCanceled());
-			}
+			if (cancellationToken != new CancellationToken()) cancellationToken.Register(() => tcs.TrySetCanceled());
 
 			return !process.HasExited ? tcs.Task : Task.CompletedTask;
 		}

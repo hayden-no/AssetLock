@@ -45,30 +45,39 @@ namespace AssetLock.Editor.Manager
 						if (!File.Exists)
 						{
 							Completed?.Invoke(File, "The file was moved or deleted before it could be locked.");
+
 							return;
 						}
+
 						if (!Instance.m_lockRepo.ContainsKey(File)) await Instance.InternalTrackFileAsync(File);
 						var current = Instance.m_lockRepo[File];
+
 						if (current.locked && !current.LockedByMe)
 						{
 							Completed?.Invoke(File, $"Locked by {current.owner ?? "another user"}.");
+
 							return;
 						}
+
 						if (!current.LockedByMe) await Instance.InternalLockFileAsync(File);
-						Completed?.Invoke(File, Instance.m_lockRepo.TryGetValue(File, out var acquired) && acquired.LockedByMe
-							? null : "The lock server did not grant the lock.");
+						Completed?.Invoke(
+							File,
+							Instance.m_lockRepo.TryGetValue(File, out var acquired) && acquired.LockedByMe
+								? null
+								: "The lock server did not grant the lock."
+						);
 					}
 					catch (Exception error)
 					{
 						Completed?.Invoke(File, $"Lock request failed ({error.GetType().Name}).");
+
 						throw;
 					}
+
 					return;
 				}
-				if (!File.Exists)
-				{
-					throw new FileNotFoundException("File not found", File.GitPath);
-				}
+
+				if (!File.Exists) throw new FileNotFoundException("File not found", File.GitPath);
 
 				switch (Kind)
 				{
@@ -97,30 +106,15 @@ namespace AssetLock.Editor.Manager
 				}
 			}
 
-			private async Task Track()
-			{
-				await Instance.InternalTrackFileAsync(File, Force);
-			}
+			private async Task Track() => await Instance.InternalTrackFileAsync(File, Force);
 
-			private async Task Untrack()
-			{
-				await Instance.InternalUntrackFileAsync(File, Force);
-			}
+			private async Task Untrack() => await Instance.InternalUntrackFileAsync(File, Force);
 
-			private async Task Lock()
-			{
-				await Instance.InternalLockFileAsync(File);
-			}
+			private async Task Lock() => await Instance.InternalLockFileAsync(File);
 
-			private async Task Unlock()
-			{
-				await Instance.InternalUnlockFileAsync(File, Force);
-			}
+			private async Task Unlock() => await Instance.InternalUnlockFileAsync(File, Force);
 
-			private async Task Update()
-			{
-				await Instance.InternalRefreshLockAsync(File);
-			}
+			private async Task Update() => await Instance.InternalRefreshLockAsync(File);
 		}
 
 		/// <summary>
@@ -129,8 +123,15 @@ namespace AssetLock.Editor.Manager
 		private async Task InitGitLfs()
 		{
 			m_initializing = true;
-			try { await InitGitLfsCore(); }
-			finally { m_initializing = false; }
+
+			try
+			{
+				await InitGitLfsCore();
+			}
+			finally
+			{
+				m_initializing = false;
+			}
 		}
 
 		private async Task InitGitLfsCore()
@@ -139,18 +140,17 @@ namespace AssetLock.Editor.Manager
 			const string envCmd = "env";
 
 			// Git LFS otherwise tries to replace our cooperative pre-push wrapper.
-			bool wrapped = !TestMode && await PushUnlockPrompt.IsInstalledAsync();
-			var init = wrapped ? await m_lfsProcess.RunCommandAsync(installCmd, "--skip-repo") : await m_lfsProcess.RunCommandAsync(installCmd);
+			var wrapped = !TestMode && await PushUnlockPrompt.IsInstalledAsync();
+			var init = wrapped
+				? await m_lfsProcess.RunCommandAsync(installCmd, "--skip-repo")
+				: await m_lfsProcess.RunCommandAsync(installCmd);
 			CheckForFailedHooks(init);
 			ThrowOnProcessError(init, "failed to initialize git-lfs");
 
-			string user = await GetGitUser();
+			var user = await GetGitUser();
 
-			if (!string.IsNullOrEmpty(user))
-			{
-				m_user = user;
-			}
-			
+			if (!string.IsNullOrEmpty(user)) m_user = user;
+
 			var env = await m_lfsProcess.RunCommandAsync(envCmd);
 
 			if (TryGetLfsEndpointFromEnv(env.StdOut, out var url))
@@ -159,7 +159,8 @@ namespace AssetLock.Editor.Manager
 				GitLfsServerLocksApiUrl.SetValue(url + "/locks");
 			}
 
-			bool gotDir = false;
+			var gotDir = false;
+
 			if (TryGetLfsWorkingDirFromEnv(env.StdOut, out var dir))
 			{
 				GitWorkingDirectoryReference = DirectoryReference.FromPath(dir);
@@ -174,9 +175,7 @@ namespace AssetLock.Editor.Manager
 			Logging.LogFormat("Git LFS environment: {0}", env);
 
 			if (string.IsNullOrWhiteSpace(GitWorkingDirectory))
-			{
 				GitWorkingDirectory.SetValue(await GetGitWorkingDirectory());
-			}
 
 			if (!gotDir && !string.IsNullOrWhiteSpace(GitWorkingDirectory))
 			{
@@ -191,11 +190,8 @@ namespace AssetLock.Editor.Manager
 				GitLfsServerUrl.SetValue(gitRemote + "/info/lfs");
 				GitLfsServerLocksApiUrl.SetValue(gitRemote + "/info/lfs/locks");
 			}
-			
-			if (!gotDir)
-			{
-				Logging.LogError("Failed to get git working directory.");
-			}
+
+			if (!gotDir) Logging.LogError("Failed to get git working directory.");
 
 			if (gotDir && !string.IsNullOrEmpty(m_user))
 			{
@@ -203,10 +199,7 @@ namespace AssetLock.Editor.Manager
 				Logging.LogFormat("Git LFS initialized for user {0}", m_user);
 			}
 
-			if (IsReady && ParseFilesOnStartup)
-			{
-				ParseAll();
-			}
+			if (IsReady && ParseFilesOnStartup) ParseAll();
 		}
 
 		/// <summary>
@@ -217,17 +210,15 @@ namespace AssetLock.Editor.Manager
 		{
 			const string cmd = "update";
 			const string arg1 = "--force";
-			
+
 			const string expected = "Updated Git hooks.";
 
 			var result = await m_lfsProcess.RunCommandAsync(cmd, arg1);
-			
+
 			ThrowOnProcessError(result, "failed to force update");
-			
+
 			if (!result.StdOut.Contains(expected))
-			{
 				Logging.LogWarning("Failed to force update git hooks. Please check the git-lfs installation.");
-			}
 		}
 
 		/// <summary>
@@ -258,14 +249,11 @@ namespace AssetLock.Editor.Manager
 			ThrowOnProcessError(result);
 
 			var lines = result.StdOut.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-			string repo = string.Empty;
+			var repo = string.Empty;
 
 			foreach (var line in lines)
 			{
-				if (!line.Contains("(fetch)"))
-				{
-					continue;
-				}
+				if (!line.Contains("(fetch)")) continue;
 
 				repo = line.Split('\t')[1]
 					.Split(' ')[0]; // example: origin  https://github.com/hayden-no/AssetLock.git (fetch)
@@ -414,7 +402,11 @@ namespace AssetLock.Editor.Manager
 			}
 			else
 			{
-				var result = await m_lfsProcess.RunCommandAsync(cmd, force ? frc : string.Empty, reference.AsProcessArg());
+				var result = await m_lfsProcess.RunCommandAsync(
+					cmd,
+					force ? frc : string.Empty,
+					reference.AsProcessArg()
+				);
 				ThrowOnProcessError(result);
 				m_lockRepo[reference] = reference.ToLock();
 			}
@@ -436,12 +428,13 @@ namespace AssetLock.Editor.Manager
 
 			if (UseHttp)
 			{
-				var request = new ListLocksRequest() { Path = reference.GitPath };
+				var request = new ListLocksRequest { Path = reference.GitPath };
 				var (success, _, locks) = await ListLocksHttp(request);
 
 				if (success)
 				{
 					var arr = locks.ToArray();
+
 					foreach (var info in arr)
 					{
 						m_lockRepo[info] = info;
@@ -458,7 +451,7 @@ namespace AssetLock.Editor.Manager
 			{
 				var result = await m_lfsProcess.RunCommandAsync(cmd, Constants.JSON_FLAG, GetFileArg());
 				ThrowOnProcessError(result, $"failed to check if file is locked\n{reference}\n");
-				string json = result.StdOut;
+				var json = result.StdOut;
 
 				if (string.IsNullOrWhiteSpace(json))
 				{
@@ -468,7 +461,7 @@ namespace AssetLock.Editor.Manager
 					return false;
 				}
 
-				bool locked = false;
+				var locked = false;
 
 				foreach (var info in FromJson(json))
 				{
@@ -499,22 +492,23 @@ namespace AssetLock.Editor.Manager
 				var allLocks = new List<LockInfo>();
 				var seenCursors = new HashSet<string>();
 				string cursor = null;
+
 				do
 				{
 					var (success, nextCursor, locks) = await ListLocksHttp(new ListLocksRequest { Cursor = cursor });
-					if (!success || locks == null)
-					{
-						return null;
-					}
+
+					if (!success || locks == null) return null;
+
 					allLocks.AddRange(locks);
 					cursor = nextCursor;
+
 					if (!string.IsNullOrEmpty(cursor) && !seenCursors.Add(cursor))
 					{
 						Logging.LogError("Git LFS returned a repeated lock cursor.");
+
 						return null;
 					}
-				}
-				while (!string.IsNullOrEmpty(cursor));
+				} while (!string.IsNullOrEmpty(cursor));
 
 				return allLocks;
 			}

@@ -19,30 +19,24 @@ namespace AssetLock.Editor.UI
 		protected virtual string Title => Constants.SETTINGS_TITLE;
 		protected abstract IEnumerable<string> GetSettingNames();
 
-		protected AbstractSettingsProvider(string path, SettingsScope scope, string[] keywords = null)
-			: base(path, scope, keywords) { }
+		protected AbstractSettingsProvider(string path, SettingsScope scope, string[] keywords = null) : base(
+			path,
+			scope,
+			keywords
+		) { }
 
 		public override void OnTitleBarGUI()
 		{
 			// do nothing
 		}
 
-		public override void OnGUI(string searchContext)
-		{
-			ContentGUI(searchContext);
-		}
+		public override void OnGUI(string searchContext) => ContentGUI(searchContext);
 
 		public override bool HasSearchInterest(string searchContext)
 		{
-			if (string.IsNullOrEmpty(searchContext))
-			{
-				return false;
-			}
+			if (string.IsNullOrEmpty(searchContext)) return false;
 
-			if (Title.Contains(searchContext))
-			{
-				return true;
-			}
+			if (Title.Contains(searchContext)) return true;
 
 			return GetSettingNames().Any(name => name.Contains(searchContext));
 		}
@@ -55,31 +49,35 @@ namespace AssetLock.Editor.UI
 	/// </summary>
 	internal class ProjectSettingsProvider : AbstractSettingsProvider
 	{
-		readonly GUIContent m_configLabel = new("Configuration");
+		private readonly GUIContent m_configLabel = new("Configuration");
 
-		readonly GUIContent m_trackedExtensionsLabel = new(
+		private readonly GUIContent m_trackedExtensionsLabel = new(
 			"Tracked File Extensions",
 			"Only files with these extensions will be considered for tracking"
 		);
-		
-		readonly GUIContent m_trackNonBinaryFilesLabel = new(
+
+		private readonly GUIContent m_trackNonBinaryFilesLabel = new(
 			"Track Non-Binary Files",
 			"Enable/disable tracking of non-binary files (only enable if you know what you're doing)"
 		);
 
-		readonly GUIContent m_quickCheckLabel = new("Quick Check Size", "The size of the quick check buffer");
-		readonly GUIContent m_gitRemoteUrlLabel = new("Git Remote URL", "Remote URL for git operations");
-		readonly GUIContent m_gitLfsServerLabel = new("Git LFS Server", "Server for git-lfs operations");
-		readonly GUIContent m_pushUnlockBranchesLabel = new("Push Unlock Prompt Branches", "Destination branch names that may trigger an unlock prompt.");
+		private readonly GUIContent m_quickCheckLabel = new("Quick Check Size", "The size of the quick check buffer");
+		private readonly GUIContent m_gitRemoteUrlLabel = new("Git Remote URL", "Remote URL for git operations");
+		private readonly GUIContent m_gitLfsServerLabel = new("Git LFS Server", "Server for git-lfs operations");
 
-		readonly GUIContent m_gitLfsServerLocksLabel = new(
+		private readonly GUIContent m_pushUnlockBranchesLabel = new(
+			"Push Unlock Prompt Branches",
+			"Destination branch names that may trigger an unlock prompt."
+		);
+
+		private readonly GUIContent m_gitLfsServerLocksLabel = new(
 			"Git LFS Server Locks",
 			"Server endpoint for git-lfs lock api operations"
 		);
-		
-		readonly GUIContent m_testConnectionLabel = new("Test Connection", "Test connection to the git server");
 
-		IEnumerable<GUIContent> GUIContents()
+		private readonly GUIContent m_testConnectionLabel = new("Test Connection", "Test connection to the git server");
+
+		private IEnumerable<GUIContent> GUIContents()
 		{
 			yield return m_configLabel;
 			yield return m_trackedExtensionsLabel;
@@ -91,13 +89,10 @@ namespace AssetLock.Editor.UI
 			yield return m_testConnectionLabel;
 		}
 
-		protected override IEnumerable<string> GetSettingNames()
-		{
-			return GUIContents().SelectMany(content => content.text.Split(' '));
-		}
+		protected override IEnumerable<string> GetSettingNames() =>
+			GUIContents().SelectMany(content => content.text.Split(' '));
 
-		public ProjectSettingsProvider()
-			: base(Constants.PROJECT_SETTINGS_PROVIDER_PATH, SettingsScope.Project) { }
+		public ProjectSettingsProvider() : base(Constants.PROJECT_SETTINGS_PROVIDER_PATH, SettingsScope.Project) { }
 
 		protected override void ContentGUI(string ctx)
 		{
@@ -106,47 +101,45 @@ namespace AssetLock.Editor.UI
 			SearchableToggle(m_trackNonBinaryFilesLabel, TrackNonBinaryFiles, ctx);
 			EditorGUI.BeginChangeCheck();
 			SearchableStringField(m_gitRemoteUrlLabel, GitRemoteUrl, ctx);
+
 			if (EditorGUI.EndChangeCheck())
 			{
 				if (string.IsNullOrEmpty(GitLfsServerUrl))
 				{
-					GitLfsServerUrl.value = GetDefaultLfsEndpoint(GitRemoteUrl); 
+					GitLfsServerUrl.value = GetDefaultLfsEndpoint(GitRemoteUrl);
 					GitLfsServerUrl.ApplyModifiedProperties();
 				}
+
 				if (string.IsNullOrEmpty(GitLfsServerLocksApiUrl))
 				{
 					GitLfsServerLocksApiUrl.value = GitLfsServerUrl + Constants.GIT_LFS_SERVER_LOCKS_API_EXT;
 					GitLfsServerLocksApiUrl.ApplyModifiedProperties();
 				}
 			}
+
 			SearchableStringField(m_gitLfsServerLabel, GitLfsServerUrl, ctx);
 			SearchableStringField(m_gitLfsServerLocksLabel, GitLfsServerLocksApiUrl, ctx);
+
 			if (MatchSearchGroups(ctx, m_pushUnlockBranchesLabel.text))
 			{
 				LabelField(m_pushUnlockBranchesLabel);
 				SearchableStringList(m_pushUnlockBranchesLabel, PushUnlockBranches, ctx);
 			}
-			if (Button(m_testConnectionLabel))
-			{
-				TestConnection();
-			}
+
+			if (Button(m_testConnectionLabel)) TestConnection();
 			Space();
 			SearchableStringList(m_trackedExtensionsLabel, TrackedFileEndings, ctx);
 			EndSearchableGroup(m_configLabel, ctx);
 		}
 
-		async void TestConnection()
+		private async void TestConnection()
 		{
-			(var successs, var err) = await AssetLockManager.Instance.TestConnection();
-			
+			var (successs, err) = await AssetLockManager.Instance.TestConnection();
+
 			if (successs)
-			{
 				EditorUtility.DisplayDialog("Connection Test", "Connection successful!", "OK");
-			}
 			else
-			{
 				EditorUtility.DisplayDialog("Connection Test", $"Connection failed: {err}", "OK");
-			}
 		}
 	}
 
@@ -155,66 +148,133 @@ namespace AssetLock.Editor.UI
 	/// </summary>
 	internal class UserSettingsProvider : AbstractSettingsProvider
 	{
-		readonly GUIContent m_configLabel = new("Configuration");
-		readonly GUIContent m_masterEnableLabel = new("Master Enable", "Enable/disable AssetLock");
-		readonly GUIContent m_autoLockLabel = new("Auto Lock", "Enable/disable auto-locking of assets");
-		readonly GUIContent m_legacyBrowserLabel = new("Use Legacy Lock Browser", "Use the original Lock Browser instead of the UI Toolkit browser.");
-		readonly GUIContent m_warnOnlyLabel = new("Warn Instead of Blocking", "Allow asset operations and warn when lock ownership is missing or belongs to another user.");
-		readonly GUIContent m_suppressAutoLockFailureDialogsLabel = new("Suppress Auto Lock Failure Dialogs", "Do not show a dialog when an automatic lock attempt fails in warning mode.");
-		readonly GUIContent m_pushPromptLabel = new("Prompt to Unlock on Push", "Monitor pushes to configured branches while the editor is open. Install the hook below to enable detection.");
-		readonly GUIContent m_suppressPushPromptLabel = new("Suppress Push Unlock Prompts", "Skip prompts and keep locks. Suppression never unlocks files.");
+		private readonly GUIContent m_configLabel = new("Configuration");
+		private readonly GUIContent m_masterEnableLabel = new("Master Enable", "Enable/disable AssetLock");
+		private readonly GUIContent m_autoLockLabel = new("Auto Lock", "Enable/disable auto-locking of assets");
+
+		private readonly GUIContent m_legacyBrowserLabel = new(
+			"Use Legacy Lock Browser",
+			"Use the original Lock Browser instead of the UI Toolkit browser."
+		);
+
+		private readonly GUIContent m_warnOnlyLabel = new(
+			"Warn Instead of Blocking",
+			"Allow asset operations and warn when lock ownership is missing or belongs to another user."
+		);
+
+		private readonly GUIContent m_suppressAutoLockFailureDialogsLabel = new(
+			"Suppress Auto Lock Failure Dialogs",
+			"Do not show a dialog when an automatic lock attempt fails in warning mode."
+		);
+
+		private readonly GUIContent m_pushPromptLabel = new(
+			"Prompt to Unlock on Push",
+			"Monitor pushes to configured branches while the editor is open. Install the hook below to enable detection."
+		);
+
+		private readonly GUIContent m_suppressPushPromptLabel = new(
+			"Suppress Push Unlock Prompts",
+			"Skip prompts and keep locks. Suppression never unlocks files."
+		);
+
 		private string m_pushHookMessage;
 		private bool m_pushHookBusy;
-		readonly GUIContent m_parseFilesOnStartupLabel = new("Parse Files On Startup", "Enable/disable parsing of files on startup");
-		readonly GUIContent m_useblockingCallsInProcessorLabel = new(
+
+		private readonly GUIContent m_parseFilesOnStartupLabel = new(
+			"Parse Files On Startup",
+			"Enable/disable parsing of files on startup"
+		);
+
+		private readonly GUIContent m_useblockingCallsInProcessorLabel = new(
 			"Use Blocking Calls In Processor",
 			"When enabled, certain editor locking operations will block the main thread"
 		);
-		readonly GUIContent m_refreshRateLabel = new("Refresh Rate", "Rate in seconds to refresh lock status");
-		readonly GUIContent m_gitExeLabel = new("Git Executable", "Path to git executable");
-		readonly GUIContent m_gitDownloadLabel = new("Download Git", Constants.GIT_DOWNLOAD_URL);
-		readonly GUIContent m_gitLfsExeLabel = new("Git LFS Executable", "Path to git-lfs executable");
-		readonly GUIContent m_gitLfsDownloadLabel = new("Download Git LFS", Constants.GIT_LFS_DOWNLOAD_URL);
-		
-		readonly GUIContent m_gitCredentialsHeader = new("Git Credentials");
-		readonly GUIContent m_useGitHelperLabel = new("Use Git Credential Helper", "Use the helper configured for this project for HTTP lock requests.");
+
+		private readonly GUIContent m_refreshRateLabel = new("Refresh Rate", "Rate in seconds to refresh lock status");
+		private readonly GUIContent m_gitExeLabel = new("Git Executable", "Path to git executable");
+		private readonly GUIContent m_gitDownloadLabel = new("Download Git", Constants.GIT_DOWNLOAD_URL);
+		private readonly GUIContent m_gitLfsExeLabel = new("Git LFS Executable", "Path to git-lfs executable");
+		private readonly GUIContent m_gitLfsDownloadLabel = new("Download Git LFS", Constants.GIT_LFS_DOWNLOAD_URL);
+
+		private readonly GUIContent m_gitCredentialsHeader = new("Git Credentials");
+
+		private readonly GUIContent m_useGitHelperLabel = new(
+			"Use Git Credential Helper",
+			"Use the helper configured for this project for HTTP lock requests."
+		);
+
 		private string m_identityMessage = "";
 		private int m_savedIdentityIndex;
 		private bool m_signingIn;
-		readonly GUIContent m_gitCredentialsTypeLabel = new("Git Credentials Type", "Type of credentials to use for git operations");
-		readonly GUIContent m_gitHubAuthTokenLabel = new("GitHub Remote Auth Token", "Remote auth token for github operations");
-		readonly GUIContent m_gitLabUsernameLabel = new("GitLab Username", "Username for gitlab operations");
-		readonly GUIContent m_gitLabAuthTokenLabel = new("GitLab Auth Token", "Auth token for gitlab operations");
-		readonly GUIContent m_gitCustomUsernameLabel = new("Username", "Username for git operations");
-		readonly GUIContent m_gitCustomPasswordLabel = new("Password", "Password for git operations");
 
-		readonly GUIContent m_debugLabel = new("Debug");
-		readonly GUIContent m_debugModeLabel = new("Debug Mode", "Enable/disable debug mode");
+		private readonly GUIContent m_gitCredentialsTypeLabel = new(
+			"Git Credentials Type",
+			"Type of credentials to use for git operations"
+		);
 
-		readonly GUIContent m_forceSyncLabel = new(
+		private readonly GUIContent m_gitHubAuthTokenLabel = new(
+			"GitHub Remote Auth Token",
+			"Remote auth token for github operations"
+		);
+
+		private readonly GUIContent m_gitLabUsernameLabel = new("GitLab Username", "Username for gitlab operations");
+
+		private readonly GUIContent m_gitLabAuthTokenLabel = new(
+			"GitLab Auth Token",
+			"Auth token for gitlab operations"
+		);
+
+		private readonly GUIContent m_gitCustomUsernameLabel = new("Username", "Username for git operations");
+		private readonly GUIContent m_gitCustomPasswordLabel = new("Password", "Password for git operations");
+
+		private readonly GUIContent m_debugLabel = new("Debug");
+		private readonly GUIContent m_debugModeLabel = new("Debug Mode", "Enable/disable debug mode");
+
+		private readonly GUIContent m_forceSyncLabel = new(
 			"Force Synchronous Process Handling",
 			"Enable/disable asynchronous process handling"
 		);
 
-		readonly GUIContent m_useHttpLabel = new("Use HTTP", "Enable/disable HTTP for git operations");
-		readonly GUIContent m_logHttpLabel = new("Log HTTP", "Enable/disable HTTP logging");
+		private readonly GUIContent m_useHttpLabel = new("Use HTTP", "Enable/disable HTTP for git operations");
+		private readonly GUIContent m_logHttpLabel = new("Log HTTP", "Enable/disable HTTP logging");
 
-		readonly GUIContent m_verboseLoggingLabel = new("Verbose Logging", "Enable/disable verbose logging");
-		readonly GUIContent m_enableProfilingLabel = new("Enable Profiling", "Enable/disable various debug profiling");
-		readonly GUIContent m_profilingMinTimeLabel = new("Profiling Min Time", "Minimum time in ms to log profile");
-		readonly GUIContent m_rebootLabel = new("Reboot", "Reboot AssetLock");
-		readonly GUIContent m_printLocksLabel = new("Print Locks", "Print all locks");
-		readonly GUIContent m_clearLocksLabel = new("Clear Locks", "Clear all locks");
-		readonly GUIContent m_parseAllAssetsLabel = new("Parse All Assets", "Parse all assets for lockable files");
-		readonly GUIContent m_gitLfsHooksFix = new("Invalid Git LFS Hooks Fix", "Attempt to fix the invalid git lfs hooks error by force updating git lfs");
+		private readonly GUIContent m_verboseLoggingLabel = new("Verbose Logging", "Enable/disable verbose logging");
 
-		readonly GUIContent m_loggingLabel = new("Logging");
-		readonly GUIContent m_infoLoggingLabel = new("Info Logging", "Enable/disable info logging");
-		readonly GUIContent m_warningLoggingLabel = new("Warning Logging", "Enable/disable warning logging");
-		readonly GUIContent m_errorLoggingLabel = new("Error Logging", "Enable/disable error logging");
-		readonly GUIContent m_addAssetReferenceToLogsLabel = new("Add Asset Reference To Logs", "Enable/disable adding asset reference to logs (this involves loading the asset)");
+		private readonly GUIContent m_enableProfilingLabel = new(
+			"Enable Profiling",
+			"Enable/disable various debug profiling"
+		);
 
-		IEnumerable<GUIContent> GUIContents()
+		private readonly GUIContent m_profilingMinTimeLabel = new(
+			"Profiling Min Time",
+			"Minimum time in ms to log profile"
+		);
+
+		private readonly GUIContent m_rebootLabel = new("Reboot", "Reboot AssetLock");
+		private readonly GUIContent m_printLocksLabel = new("Print Locks", "Print all locks");
+		private readonly GUIContent m_clearLocksLabel = new("Clear Locks", "Clear all locks");
+
+		private readonly GUIContent m_parseAllAssetsLabel = new(
+			"Parse All Assets",
+			"Parse all assets for lockable files"
+		);
+
+		private readonly GUIContent m_gitLfsHooksFix = new(
+			"Invalid Git LFS Hooks Fix",
+			"Attempt to fix the invalid git lfs hooks error by force updating git lfs"
+		);
+
+		private readonly GUIContent m_loggingLabel = new("Logging");
+		private readonly GUIContent m_infoLoggingLabel = new("Info Logging", "Enable/disable info logging");
+		private readonly GUIContent m_warningLoggingLabel = new("Warning Logging", "Enable/disable warning logging");
+		private readonly GUIContent m_errorLoggingLabel = new("Error Logging", "Enable/disable error logging");
+
+		private readonly GUIContent m_addAssetReferenceToLogsLabel = new(
+			"Add Asset Reference To Logs",
+			"Enable/disable adding asset reference to logs (this involves loading the asset)"
+		);
+
+		private IEnumerable<GUIContent> GUIContents()
 		{
 			yield return m_masterEnableLabel;
 			yield return m_autoLockLabel;
@@ -257,13 +317,10 @@ namespace AssetLock.Editor.UI
 			yield return m_gitLfsHooksFix;
 		}
 
-		protected override IEnumerable<string> GetSettingNames()
-		{
-			return GUIContents().SelectMany(content => content.text.Split(' '));
-		}
+		protected override IEnumerable<string> GetSettingNames() =>
+			GUIContents().SelectMany(content => content.text.Split(' '));
 
-		public UserSettingsProvider()
-			: base(Constants.USER_SETTINGS_PROVIDER_PATH, SettingsScope.User) { }
+		public UserSettingsProvider() : base(Constants.USER_SETTINGS_PROVIDER_PATH, SettingsScope.User) { }
 
 		protected override void ContentGUI(string ctx)
 		{
@@ -277,34 +334,48 @@ namespace AssetLock.Editor.UI
 			SearchableToggle(m_suppressAutoLockFailureDialogsLabel, SuppressAutoLockFailureDialogs, ctx);
 			SearchableToggle(m_pushPromptLabel, EnablePushUnlockPrompts, ctx);
 			SearchableToggle(m_suppressPushPromptLabel, SuppressPushUnlockPrompts, ctx);
+
 			if (MatchSearchGroups(ctx, "Push Unlock Prompt Hook"))
 			{
-				EditorGUILayout.HelpBox("Install the local Git hook to detect push attempts. Git cannot confirm success from this hook; locks are released only when you choose to unlock. Suppressing prompts keeps locks.", MessageType.Info);
+				HelpBox(
+					"Install the local Git hook to detect push attempts. Git cannot confirm success from this hook; locks are released only when you choose to unlock. Suppressing prompts keeps locks.",
+					MessageType.Info
+				);
+
 				using (new EditorGUI.DisabledScope(m_pushHookBusy))
-				using (new EditorGUILayout.HorizontalScope())
 				{
-					if (GUILayout.Button("Install Push Hook")) ChangePushHook(true);
-					if (GUILayout.Button("Remove Push Hook")) ChangePushHook(false);
+					using (new EditorGUILayout.HorizontalScope())
+					{
+						if (Button("Install Push Hook")) ChangePushHook(true);
+						if (Button("Remove Push Hook")) ChangePushHook(false);
+					}
 				}
-				if (!string.IsNullOrEmpty(m_pushHookMessage)) EditorGUILayout.HelpBox(m_pushHookMessage, MessageType.Info);
+
+				if (!string.IsNullOrEmpty(m_pushHookMessage)) HelpBox(m_pushHookMessage, MessageType.Info);
 			}
+
 			SearchableToggle(m_parseFilesOnStartupLabel, ParseFilesOnStartup, ctx);
 			SearchableToggle(m_useblockingCallsInProcessorLabel, UseBlockingCallsInProcessor, ctx);
 			SearchableNumericField(m_refreshRateLabel, AssetLockSettings.RefreshRate, ctx);
 
 			Space();
-			
+
 			BeginSearchableGroup(m_gitCredentialsHeader, ctx);
-			if (MatchSearchGroups(ctx, m_gitCredentialsHeader.text) || MatchSearchGroups(ctx, "Identity Account Profile Username Sign In"))
+
+			if (MatchSearchGroups(ctx, m_gitCredentialsHeader.text) ||
+				MatchSearchGroups(ctx, "Identity Account Profile Username Sign In"))
 			{
 				SearchableToggle(m_useGitHelperLabel, UseGitCredentialHelper, "");
-				if (UseGitCredentialHelper) DrawGitIdentities();
-				else DrawLegacyCredentials();
+				if (UseGitCredentialHelper)
+					DrawGitIdentities();
+				else
+					DrawLegacyCredentials();
 			}
+
 			EndSearchableGroup(m_gitCredentialsHeader, ctx);
 
 			Space();
-			
+
 			SearchableFilePicker(
 				m_gitExeLabel,
 				GitPath,
@@ -366,92 +437,157 @@ namespace AssetLock.Editor.UI
 		private async void ChangePushHook(bool install)
 		{
 			m_pushHookBusy = true;
+
 			try
 			{
-				m_pushHookMessage = install ? await PushUnlockPrompt.InstallAsync() : await PushUnlockPrompt.RemoveAsync();
+				m_pushHookMessage =
+					install ? await PushUnlockPrompt.InstallAsync() : await PushUnlockPrompt.RemoveAsync();
 			}
-			catch (System.Exception error) { m_pushHookMessage = error.Message; }
-			finally { m_pushHookBusy = false; UnityEditorInternal.InternalEditorUtility.RepaintAllViews(); }
+			catch (System.Exception error)
+			{
+				m_pushHookMessage = error.Message;
+			}
+			finally
+			{
+				m_pushHookBusy = false;
+				UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
+			}
 		}
 
 		private void DrawGitIdentities()
 		{
-			EditorGUILayout.HelpBox("Account details are private to this project. Passwords and tokens are managed by Git's configured credential helper.", MessageType.Info);
+			HelpBox(
+				"Account details are private to this project. Passwords and tokens are managed by Git's configured credential helper.",
+				MessageType.Info
+			);
 			var identity = CredentialIdentities.Current;
 			EditorGUI.BeginChangeCheck();
-			identity.Name = EditorGUILayout.TextField("Profile Name", identity.Name ?? "");
-			identity.Username = EditorGUILayout.TextField("Account Username", identity.Username ?? "");
+			identity.Name = TextField("Profile Name", identity.Name ?? "");
+			identity.Username = TextField("Account Username", identity.Username ?? "");
+
 			if (EditorGUI.EndChangeCheck())
 			{
-				if (string.IsNullOrEmpty(identity.Authority)) identity.Authority = CredentialIdentities.AuthorityOf(GitLfsServerUrl.value);
+				if (string.IsNullOrEmpty(identity.Authority))
+					identity.Authority = CredentialIdentities.AuthorityOf(GitLfsServerUrl.value);
 				CredentialIdentities.Current = identity;
 			}
-			EditorGUILayout.LabelField("Account Server", string.IsNullOrEmpty(identity.Authority) ? "Not set" : identity.Authority);
-			if (GUILayout.Button("Use Current LFS Server"))
+
+			LabelField("Account Server", string.IsNullOrEmpty(identity.Authority) ? "Not set" : identity.Authority);
+
+			if (Button("Use Current LFS Server"))
 			{
 				identity.Authority = CredentialIdentities.AuthorityOf(GitLfsServerUrl.value);
 				CredentialIdentities.Current = identity;
 			}
+
 			using (new EditorGUI.DisabledScope(m_signingIn))
 			{
-				if (GUILayout.Button("Sign In and Test Connection")) SignIn();
-				if (GUILayout.Button("Save Profile for Other Projects"))
-				{
-					try { CredentialIdentities.SaveProfile(identity); m_identityMessage = "Profile saved."; }
-					catch (System.Exception error) { m_identityMessage = error.Message; }
-				}
+				if (Button("Sign In and Test Connection")) SignIn();
+
+				if (Button("Save Profile for Other Projects"))
+					try
+					{
+						CredentialIdentities.SaveProfile(identity);
+						m_identityMessage = "Profile saved.";
+					}
+					catch (System.Exception error)
+					{
+						m_identityMessage = error.Message;
+					}
 			}
+
 			var saved = CredentialIdentities.Saved;
+
 			if (saved.Count > 0)
 			{
 				m_savedIdentityIndex = Mathf.Clamp(m_savedIdentityIndex, 0, saved.Count - 1);
-				m_savedIdentityIndex = EditorGUILayout.Popup("Saved Profiles", m_savedIdentityIndex, saved.Select(p => p.Name).ToArray());
+				m_savedIdentityIndex = Popup(
+					"Saved Profiles",
+					m_savedIdentityIndex,
+					saved.Select(p => p.Name).ToArray()
+				);
+
 				using (new EditorGUILayout.HorizontalScope())
 				{
-					if (GUILayout.Button("Import Profile")) { CredentialIdentities.Current = saved[m_savedIdentityIndex]; m_identityMessage = "Profile imported for this project."; }
-					if (GUILayout.Button("Delete Saved Profile")) { CredentialIdentities.DeleteProfile(saved[m_savedIdentityIndex].Name); m_identityMessage = "Saved profile removed."; }
+					if (Button("Import Profile"))
+					{
+						CredentialIdentities.Current = saved[m_savedIdentityIndex];
+						m_identityMessage = "Profile imported for this project.";
+					}
+
+					if (Button("Delete Saved Profile"))
+					{
+						CredentialIdentities.DeleteProfile(saved[m_savedIdentityIndex].Name);
+						m_identityMessage = "Saved profile removed.";
+					}
 				}
 			}
-			if (!string.IsNullOrEmpty(m_identityMessage)) EditorGUILayout.HelpBox(m_identityMessage, MessageType.Info);
+
+			if (!string.IsNullOrEmpty(m_identityMessage)) HelpBox(m_identityMessage, MessageType.Info);
 		}
 
 		private async void SignIn()
 		{
 			m_signingIn = true;
 			m_identityMessage = "Signing in...";
+
 			try
 			{
 				var manager = AssetLockManager.Instance;
-				if (manager == null || !manager.IsReady) throw new System.InvalidOperationException("AssetLock must be initialized before testing the connection.");
+
+				if (manager == null || !manager.IsReady)
+					throw new System.InvalidOperationException(
+						"AssetLock must be initialized before testing the connection."
+					);
+
 				var identity = CredentialIdentities.Current;
 				var scope = GitCredentialClient.ScopeFor(GitLfsServerLocksApiUrl.value, identity);
-				await GitCredentialClient.ConnectAsync(scope, identity, async () => (await manager.TestConnection()).success);
+				await GitCredentialClient.ConnectAsync(
+					scope,
+					identity,
+					async () => (await manager.TestConnection()).success
+				);
 				m_identityMessage = "Connection successful. The Git credential helper can reuse this account.";
 				manager.Refresh();
 			}
-			catch (System.Exception error) { m_identityMessage = error.Message; }
-			finally { m_signingIn = false; UnityEditorInternal.InternalEditorUtility.RepaintAllViews(); }
+			catch (System.Exception error)
+			{
+				m_identityMessage = error.Message;
+			}
+			finally
+			{
+				m_signingIn = false;
+				UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
+			}
 		}
 
 		private void DrawLegacyCredentials()
 		{
-			EditorGUILayout.HelpBox("These project-specific legacy credentials are stored in Unity user preferences, not a credential vault.", MessageType.Warning);
+			HelpBox(
+				"These project-specific legacy credentials are stored in Unity user preferences, not a credential vault.",
+				MessageType.Warning
+			);
 			SearchableEnumPopup(m_gitCredentialsTypeLabel, CredentialsType, "");
+
 			switch (CredentialsType.value)
 			{
 				case CredentialsKind.GitHub:
 					PasswordField(m_gitHubAuthTokenLabel, GitHubRemoteAuthToken);
+
 					break;
 				case CredentialsKind.GitLab:
 					SearchableStringField(m_gitLabUsernameLabel, GitLabRemoteUsername, "");
 					PasswordField(m_gitLabAuthTokenLabel, GitLabRemoteAuthToken);
+
 					break;
 				case CredentialsKind.UserPass:
 					SearchableStringField(m_gitCustomUsernameLabel, CredentialsUsername, "");
 					PasswordField(m_gitCustomPasswordLabel, CredentialsPassword);
+
 					break;
 			}
-			if (GUILayout.Button("Import Previous Shared Credentials"))
+
+			if (Button("Import Previous Shared Credentials"))
 			{
 				var repository = UserSettings.GetRepository(SettingsScope.User);
 				CredentialsType.SetValue(repository.Get(nameof(CredentialsType), CredentialsKind.UserPass));
@@ -466,7 +602,7 @@ namespace AssetLock.Editor.UI
 		private static void PasswordField(GUIContent label, UnityEditor.SettingsManagement.UserSetting<string> setting)
 		{
 			EditorGUI.BeginChangeCheck();
-			string value = EditorGUILayout.PasswordField(label, setting.value);
+			var value = EditorGUILayout.PasswordField(label, setting.value);
 			if (EditorGUI.EndChangeCheck()) setting.SetValue(value);
 		}
 	}

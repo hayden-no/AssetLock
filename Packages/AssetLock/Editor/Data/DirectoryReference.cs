@@ -19,18 +19,12 @@ namespace AssetLock.Editor.Data
 
 		private DirectoryReference(string path)
 		{
-			if (string.IsNullOrWhiteSpace(path))
-			{
-				throw new ArgumentException("Path is null or empty.");
-			}
+			if (string.IsNullOrWhiteSpace(path)) throw new ArgumentException("Path is null or empty.");
 
 			// sanitize path
 			path = path.Replace("\"", string.Empty);
 
-			if (path.EndsWith(Path.PathSeparator))
-			{
-				path = path[..^2]; // remove trailing slash
-			}
+			if (path.EndsWith(Path.PathSeparator)) path = path[..^2]; // remove trailing slash
 
 			AbsolutePath = Path.GetFullPath(path);
 		}
@@ -51,32 +45,18 @@ namespace AssetLock.Editor.Data
 		public bool AnyTrackedFiles => EnumerateTrackedChildFiles().Any();
 		public bool AnyTrackedDirectories => EnumerateTrackedChildDirectories().Any();
 
-		public static DirectoryReference FromPath(string path)
-		{
-			return new DirectoryReference(path);
-		}
+		public static DirectoryReference FromPath(string path) => new(path);
 
-		public static DirectoryReference FromFile(FileReference file)
-		{
-			return new DirectoryReference(Path.GetDirectoryName(file.AbsolutePath));
-		}
+		public static DirectoryReference FromFile(FileReference file) => new(Path.GetDirectoryName(file.AbsolutePath));
 
-		public static implicit operator DirectoryReference(DirectoryInfo directoryInfo)
-		{
-			return new DirectoryReference(directoryInfo.FullName);
-		}
+		public static implicit operator DirectoryReference(DirectoryInfo directoryInfo) => new(directoryInfo.FullName);
 
-		public static implicit operator DirectoryInfo(DirectoryReference directoryReference)
-		{
-			return new DirectoryInfo(directoryReference.AbsolutePath);
-		}
+		public static implicit operator DirectoryInfo(DirectoryReference directoryReference) =>
+			new(directoryReference.AbsolutePath);
 
 		public IEnumerable<DirectoryReference> EnumerateChildDirectories()
 		{
-			if (!Exists)
-			{
-				throw new DirectoryNotFoundException($"Directory not found: {AbsolutePath}");
-			}
+			if (!Exists) throw new DirectoryNotFoundException($"Directory not found: {AbsolutePath}");
 
 			foreach (var directory in Directory.EnumerateDirectories(AbsolutePath))
 			{
@@ -84,37 +64,23 @@ namespace AssetLock.Editor.Data
 			}
 		}
 
-		public IEnumerable<DirectoryReference> EnumerateTrackedChildDirectories(short searchDepth = Int16.MaxValue)
+		public IEnumerable<DirectoryReference> EnumerateTrackedChildDirectories(short searchDepth = short.MaxValue)
 		{
-			if (!Exists)
-			{
-				throw new DirectoryNotFoundException($"Directory not found: {AbsolutePath}");
-			}
+			if (!Exists) throw new DirectoryNotFoundException($"Directory not found: {AbsolutePath}");
 
-			if (searchDepth < 1)
-			{
-				yield break;
-			}
+			if (searchDepth < 1) yield break;
 
-			foreach (DirectoryReference directory in EnumerateChildDirectories())
+			foreach (var directory in EnumerateChildDirectories())
 			{
 				if (directory.AnyTrackedFiles)
-				{
 					yield return directory;
-				}
-				else if (directory.EnumerateTrackedChildDirectories(searchDepth).Any())
-				{
-					yield return directory;
-				}
+				else if (directory.EnumerateTrackedChildDirectories(searchDepth).Any()) yield return directory;
 			}
 		}
 
 		public IEnumerable<FileReference> EnumerateChildFiles(bool allowMeta = true)
 		{
-			if (!Exists)
-			{
-				throw new DirectoryNotFoundException($"Directory not found: {AbsolutePath}");
-			}
+			if (!Exists) throw new DirectoryNotFoundException($"Directory not found: {AbsolutePath}");
 
 			foreach (var file in Directory.EnumerateFiles(AbsolutePath))
 			{
@@ -124,33 +90,21 @@ namespace AssetLock.Editor.Data
 
 		public IEnumerable<FileReference> EnumerateTrackedChildFiles()
 		{
-			if (!Exists)
-			{
-				throw new DirectoryNotFoundException($"Directory not found: {AbsolutePath}");
-			}
+			if (!Exists) throw new DirectoryNotFoundException($"Directory not found: {AbsolutePath}");
 
 			foreach (var file in EnumerateChildFiles(false).Distinct())
 			{
-				if (file.Tracked && !file.IsMeta)
-				{
-					yield return file;
-				}
+				if (file.Tracked && !file.IsMeta) yield return file;
 			}
 		}
 
 		public IEnumerable<FileReference> EnumerateLockedChildFiles()
 		{
-			if (!Exists)
-			{
-				throw new DirectoryNotFoundException($"Directory not found: {AbsolutePath}");
-			}
+			if (!Exists) throw new DirectoryNotFoundException($"Directory not found: {AbsolutePath}");
 
 			foreach (var file in EnumerateChildFiles(false).Distinct())
 			{
-				if (file.Locked && !file.IsMeta)
-				{
-					yield return file;
-				}
+				if (file.Locked && !file.IsMeta) yield return file;
 			}
 		}
 
@@ -158,19 +112,14 @@ namespace AssetLock.Editor.Data
 		{
 			foreach (var file in EnumerateChildFiles(false).Distinct())
 			{
-				if (file.ShouldTrack)
-				{
-					file.TrackFile(force);
-				}
+				if (file.ShouldTrack) file.TrackFile(force);
 			}
 		}
 
-		public async Task TrackChildrenAsync(bool force = false)
-		{
+		public async Task TrackChildrenAsync(bool force = false) =>
 			await Task.WhenAll(
 				EnumerateChildFiles(false).Distinct().Where(f => f.ShouldTrack).Select(f => f.TrackFileAsync(force))
 			);
-		}
 
 		public void TrackChildrenRecursively(bool force = false)
 		{
@@ -186,19 +135,14 @@ namespace AssetLock.Editor.Data
 		{
 			foreach (var file in EnumerateChildFiles(false).Distinct())
 			{
-				if (file.Tracked)
-				{
-					file.UntrackFile(force);
-				}
+				if (file.Tracked) file.UntrackFile(force);
 			}
 		}
 
-		public async Task UntrackChildrenAsync(bool force = false)
-		{
+		public async Task UntrackChildrenAsync(bool force = false) =>
 			await Task.WhenAll(
 				EnumerateChildFiles(false).Distinct().Where(f => f.Tracked).Select(f => f.UntrackFileAsync(force))
 			);
-		}
 
 		public void UntrackChildrenRecursively(bool force = false)
 		{
@@ -214,19 +158,14 @@ namespace AssetLock.Editor.Data
 		{
 			foreach (var file in EnumerateTrackedChildFiles().Distinct())
 			{
-				if (!file.Locked)
-				{
-					file.LockFile(force);
-				}
+				if (!file.Locked) file.LockFile(force);
 			}
 		}
 
-		public async Task LockChildrenAsync(bool force = false)
-		{
+		public async Task LockChildrenAsync(bool force = false) =>
 			await Task.WhenAll(
 				EnumerateTrackedChildFiles().Distinct().Where(f => !f.Locked).Select(f => f.LockFileAsync(force))
 			);
-		}
 
 		public void LockChildrenRecursively(bool force = false)
 		{
@@ -242,19 +181,14 @@ namespace AssetLock.Editor.Data
 		{
 			foreach (var file in EnumerateTrackedChildFiles().Distinct())
 			{
-				if (file.Locked)
-				{
-					file.UnlockFile(force);
-				}
+				if (file.Locked) file.UnlockFile(force);
 			}
 		}
 
-		public async Task UnlockChildrenAsync(bool force = false)
-		{
+		public async Task UnlockChildrenAsync(bool force = false) =>
 			await Task.WhenAll(
 				EnumerateTrackedChildFiles().Distinct().Where(f => f.Locked).Select(f => f.UnlockFileAsync(force))
 			);
-		}
 
 		public void UnlockChildrenRecursively(bool force = false)
 		{
@@ -266,34 +200,27 @@ namespace AssetLock.Editor.Data
 			}
 		}
 
-		public void RefreshChildrenLocks()
-		{
+		public void RefreshChildrenLocks() =>
 			// FIXME: for now just refresh all files
 			AssetLockManager.Instance.Refresh();
-		}
 
-		public async Task RefreshChildrenLocksAsync()
-		{
+		public async Task RefreshChildrenLocksAsync() =>
 			// FIXME: for now just refresh all files
 			await AssetLockManager.Instance.RefreshAsync();
-		}
 
-		public void RefreshChildrenLocksRecursively()
-		{
+		public void RefreshChildrenLocksRecursively() =>
 			// FIXME: for now just refresh all files
 			AssetLockManager.Instance.Refresh();
 
-			// RefreshChildrenLocks();
-			//
-			// foreach (var directory in EnumerateChildDirectories())
-			// {
-			// 	directory.RefreshChildrenLocksRecursively();
-			// }
-		}
-
+		// RefreshChildrenLocks();
+		//
+		// foreach (var directory in EnumerateChildDirectories())
+		// {
+		// 	directory.RefreshChildrenLocksRecursively();
+		// }
 		public override string ToString()
 		{
-			StringBuilder sb = new StringBuilder();
+			var sb = new StringBuilder();
 			sb.AppendLine($"DirectoryReference: {Name}");
 			sb.AppendLine($"\tAbsolutePath: {AbsolutePath}");
 			sb.AppendLine($"\tGitPath: {GitPath}");
@@ -320,19 +247,11 @@ namespace AssetLock.Editor.Data
 			return sb.ToString();
 		}
 
-		public override bool Equals(object obj)
-		{
-			return obj is DirectoryReference other && this.AbsolutePath == other.AbsolutePath;
-		}
+		public override bool Equals(object obj) =>
+			obj is DirectoryReference other && AbsolutePath == other.AbsolutePath;
 
-		public override int GetHashCode()
-		{
-			return this.AbsolutePath.GetHashCode();
-		}
+		public override int GetHashCode() => AbsolutePath.GetHashCode();
 
-		public bool Equals(DirectoryReference other)
-		{
-			return AbsolutePath == other.AbsolutePath;
-		}
+		public bool Equals(DirectoryReference other) => AbsolutePath == other.AbsolutePath;
 	}
 }
