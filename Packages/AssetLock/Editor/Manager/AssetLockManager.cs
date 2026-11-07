@@ -27,8 +27,8 @@ namespace AssetLock.Editor.Manager
 		private LockRepo m_lockRepo;
 		internal IReadOnlyDictionary<FileReference, LockInfo> Repo => m_lockRepo;
 
-		private ProcessWrapper m_gitProcess;
-		private ProcessWrapper m_lfsProcess;
+		private IProcessRunner m_gitProcess;
+		private IProcessRunner m_lfsProcess;
 
 		private string m_user;
 		internal string User => m_user;
@@ -39,6 +39,8 @@ namespace AssetLock.Editor.Manager
 		// Assets directory
 		internal DirectoryReference UnityDataDirectoryReference { get; }
 		internal DirectoryReference GitWorkingDirectoryReference { get; private set; }
+		internal bool IsReady => !m_disposed && m_lockRepo != null && m_lfsInitialized &&
+		                         !string.IsNullOrEmpty(GitWorkingDirectoryReference.AbsolutePath);
 
 		private bool m_disposed;
 
@@ -84,14 +86,15 @@ namespace AssetLock.Editor.Manager
 		/// The singleton instance of the AssetLockManager.
 		/// </summary>
 		public static AssetLockManager Instance { get; private set; }
+		internal static Func<AssetLockManager> TestFactory { get; set; }
 
 		/// <summary>
 		/// Reboots the AssetLockManager.
 		/// </summary>
 		public static void Reboot()
 		{
-			Instance.Dispose();
-			Instance = new AssetLockManager();
+			Instance?.Dispose();
+			Instance = AssetLockSettings.TestMode && TestFactory != null ? TestFactory() : new AssetLockManager();
 		}
 
 		/// <summary>
@@ -99,7 +102,10 @@ namespace AssetLock.Editor.Manager
 		/// </summary>
 		static AssetLockManager()
 		{
-			Instance ??= new AssetLockManager();
+			if (!AssetLockSettings.TestMode)
+			{
+				Instance ??= new AssetLockManager();
+			}
 		}
 
 		private AssetLockManager()
@@ -132,6 +138,26 @@ namespace AssetLock.Editor.Manager
 
 			_ = InitGitLfs();
 		}
+
+		internal AssetLockManager(IProcessRunner git, IProcessRunner lfs)
+		{
+			if (!AssetLockSettings.TestMode) throw new InvalidOperationException("Test mode is required.");
+			m_gitProcess = git;
+			m_lfsProcess = lfs;
+			m_lockRepo = new LockRepo();
+			UnityDataDirectoryReference = DirectoryReference.FromPath(Application.dataPath);
+			UnityProjectDirectoryReference = UnityDataDirectoryReference.Parent;
+		}
+
+		internal static void SetTestInstance(AssetLockManager manager)
+		{
+			if (!AssetLockSettings.TestMode) throw new InvalidOperationException("Test mode is required.");
+			Instance?.Dispose();
+			Instance = manager;
+		}
+
+		internal Task InitializeForTests() => InitGitLfs();
+		internal LockRepo TestRepo => m_lockRepo;
 
 		~AssetLockManager()
 		{
@@ -167,14 +193,17 @@ Please configure both the user Preferences and Project Settings for AssetLock.
 Finally, reboot AssetLock to finish setup.  There is a button in the Lock Browser or Preferences window to do this.";
 			const string confirm = "OK";
 
-			EditorUtility.DisplayDialog(title, message, confirm);
+			if (!Application.isBatchMode)
+			{
+				EditorUtility.DisplayDialog(title, message, confirm);
+			}
 
 			Debug.Log($"[AssetLock] {message}");
 		}
 
 		private void ThrowOnProcessError(ProcessResult result, string msg = "")
 		{
-			if (result.HasErrText)
+			if (result.ExitCode != 0)
 			{
 				if (string.IsNullOrWhiteSpace(msg))
 				{

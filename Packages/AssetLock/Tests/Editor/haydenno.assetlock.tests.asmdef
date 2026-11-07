@@ -1,0 +1,7 @@
+{
+  "name": "haydenno.assetlock.tests",
+  "references": ["haydenno.assetlock", "Unity.Settings.Editor"],
+  "includePlatforms": ["Editor"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "autoReferenced": false
+}

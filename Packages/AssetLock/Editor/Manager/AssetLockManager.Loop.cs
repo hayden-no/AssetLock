@@ -52,20 +52,24 @@ namespace AssetLock.Editor.Manager
 			return await tcm.Task;
 		}
 
-		private void EndRefresh()
+		private void EndRefresh(System.Exception failure = null)
 		{
-			foreach (var tcm in m_refreshTasks)
+			var completed = new System.Collections.Generic.List<TaskCompletionSource<bool>>();
+			while (m_refreshTasks.TryTake(out var tcm))
 			{
-				tcm.SetResult(true);
+				completed.Add(tcm);
 			}
-			
-			m_refreshTasks.Clear();
+			foreach (var tcm in completed)
+			{
+				if (failure == null) tcm.TrySetResult(true);
+				else tcm.TrySetException(failure);
+			}
 			EditorApplication.RepaintProjectWindow();
 		}
 
 		private async void EditorLoop()
 		{
-			if (!MasterEnable)
+			if (!MasterEnable || !IsReady)
 			{
 				return;
 			}
@@ -75,23 +79,36 @@ namespace AssetLock.Editor.Manager
 				return;
 			}
 			
-			await InnerLoopAsync();
-			EndRefresh();
+			try
+			{
+				await InnerLoopAsync();
+				EndRefresh();
+			}
+			catch (System.Exception error)
+			{
+				Logging.LogErrorFormat("Refresh failed ({0}).", error.GetType().Name);
+				EndRefresh(error);
+			}
 		}
 
-		private async Task InnerLoopAsync()
+		internal async Task InnerLoopAsync()
 		{
 			using var profiler = new Logging.Profiler();
 			
 			Refreshing = true;
 
-			await HandleCommandsAsync();
-			
-			var locks = await InternalRefreshAllLocksAsync();
-			m_lockRepo.Update(locks);
-			
-			m_refreshTimer = AssetLockSettings.RefreshRate;
-			Refreshing = false;
+			try
+			{
+				await HandleCommandsAsync();
+				var locks = await InternalRefreshAllLocksAsync();
+				if (locks == null) throw new System.InvalidOperationException("Failed to refresh Git LFS locks.");
+				m_lockRepo.Update(locks);
+			}
+			finally
+			{
+				m_refreshTimer = AssetLockSettings.RefreshRate;
+				Refreshing = false;
+			}
 		}
 
 		private bool ShouldRunThisFrame()

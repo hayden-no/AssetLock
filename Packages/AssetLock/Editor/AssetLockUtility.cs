@@ -13,6 +13,8 @@ using UnityEngine;
 using static AssetLock.Editor.AssetLockSettings;
 using Object = UnityEngine.Object;
 
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("haydenno.assetlock.tests")]
+
 namespace AssetLock.Editor
 {
 	/// <summary>
@@ -284,8 +286,6 @@ namespace AssetLock.Editor
 					{
 						UnityEngine.Debug.LogErrorFormat(GetMessage(format), args);
 					}
-
-					UnityEngine.Debug.LogErrorFormat(GetMessage(format), args);
 				}
 			}
 
@@ -379,7 +379,7 @@ namespace AssetLock.Editor
 
 		public static bool IsControlChar(char c)
 		{
-			return (c > ControlChars.NUL && c < ControlChars.BS) || (c > ControlChars.CR && c < ControlChars.SUB);
+			return (c >= ControlChars.NUL && c < ControlChars.BS) || (c > ControlChars.CR && c < (char)32);
 		}
 
 		public static IEnumerable<FileReference> GetAllBinaryPaths(string[] assetOrMetaFilePaths)
@@ -421,9 +421,12 @@ namespace AssetLock.Editor
 				{
 					char[] buffer = new char[1024];
 
-					while (!reader.EndOfStream && fs.Position < max)
+					long remaining = max;
+					while (remaining > 0)
 					{
-						int read = reader.Read(buffer, 0, buffer.Length);
+						int read = reader.Read(buffer, 0, (int)Math.Min(buffer.Length, remaining));
+						if (read == 0) break;
+						remaining -= read;
 
 						for (int i = 0; i < read; i++)
 						{
@@ -551,10 +554,11 @@ namespace AssetLock.Editor
 			int to1 = env.IndexOf(" ", from, StringComparison.OrdinalIgnoreCase);
 			int to2 = env.IndexOf("\n", from, StringComparison.OrdinalIgnoreCase);
 			int to = to1 == -1 ? to2 : to2 == -1 ? to1 : Math.Min(to1, to2);
+			if (to == -1) to = env.Length;
 
 			from += Constants.GIT_LFS_ENV_ENDPOINT.Length;
 
-			endpointUrl = env.Substring(from, to - from);
+			endpointUrl = env.Substring(from, to - from).TrimEnd('\r');
 
 			return !string.IsNullOrWhiteSpace(endpointUrl);
 		}
@@ -570,13 +574,14 @@ namespace AssetLock.Editor
 				return false;
 			}
 
-			int to1 = env.IndexOf(" ", from, StringComparison.OrdinalIgnoreCase);
-			int to2 = env.IndexOf("\n", from, StringComparison.OrdinalIgnoreCase);
-			int to = to1 == -1 ? to2 : to2 == -1 ? to1 : Math.Min(to1, to2);
-
 			from += Constants.GIT_LFS_ENV_WORKING_DIR.Length;
+			int to = env.IndexOf('\n', from);
+			if (to == -1)
+			{
+				to = env.Length;
+			}
 
-			workingDir = env.Substring(from, to - from);
+			workingDir = env.Substring(from, to - from).TrimEnd('\r');
 
 			return !string.IsNullOrWhiteSpace(workingDir);
 		}
@@ -622,72 +627,40 @@ namespace AssetLock.Editor
 
 		public static string GetFullPath(string path)
 		{
-			// if (path.Contains(":"))
-			// {
-			// 	// path is already a full path
-			// 	return path;
-			// }
-			//
-			// if (path.StartsWith(GitWorkingDirectory))
-			// {
-			// 	// remove the git working directory
-			// 	path = path.Replace(GitWorkingDirectory, string.Empty);
-			// 	// remove the leading slash
-			// 	path = path[1..];
-			// }
-			//
-			// var projectPath = Path.Combine(Application.dataPath, "..\\");
-			//
-			// if (path.StartsWith("Assets"))
-			// {
-			// 	// Assets length is 6 plus the leading slash
-			// 	path = path[7..];
-			// }
-			//
-			// return Path.Combine(Application.dataPath, path);
-
-			if (path.Contains(":"))
+			if (Path.IsPathRooted(path))
 			{
-				// path is already a full path
-				return path;
+				return Path.GetFullPath(path);
 			}
 
 			var instance = AssetLockManager.Instance;
-			
-			if (instance == null)
+			var gitDirectory = instance?.GitWorkingDirectoryReference.AbsolutePath;
+			if (!string.IsNullOrEmpty(gitDirectory) && StartsWithDirectory(path, Path.GetFileName(gitDirectory)))
 			{
-				// FIXME: manager hasn't started yet
-				return path;
+				return Path.GetFullPath(Path.Combine(Directory.GetParent(gitDirectory).FullName, path));
 			}
 
-			try
+			var dataDirectory = Path.GetFullPath(Application.dataPath);
+			var projectDirectory = Directory.GetParent(dataDirectory).FullName;
+			if (StartsWithDirectory(path, Path.GetFileName(projectDirectory)))
 			{
-				if (path.StartsWith(instance.GitWorkingDirectoryReference.Name))
-				{
-					path = Path.Combine(instance.GitWorkingDirectoryReference.Parent.AbsolutePath, path);
-					return Path.GetFullPath(path);
-				}
-			}
-			catch
-			{
-				// ignored
+				return Path.GetFullPath(Path.Combine(Directory.GetParent(projectDirectory).FullName, path));
 			}
 
-			if (path.StartsWith(instance.UnityProjectDirectoryReference.Name))
+			if (StartsWithDirectory(path, Path.GetFileName(dataDirectory)) || StartsWithDirectory(path, "Packages"))
 			{
-				path = Path.Combine(instance.UnityProjectDirectoryReference.Parent.AbsolutePath, path);
-				return Path.GetFullPath(path);
-			}
-
-			if (path.StartsWith(instance.UnityDataDirectoryReference.Name))
-			{
-				path = Path.Combine(instance.UnityDataDirectoryReference.Parent.AbsolutePath, path);
-				return Path.GetFullPath(path);
+				return Path.GetFullPath(Path.Combine(projectDirectory, path));
 			}
 			
-			Logging.LogErrorFormat("Could not determine the full path for {0}.\nUnityProj: {1}\nUnityData: {2}", path, instance.UnityProjectDirectoryReference, instance.UnityDataDirectoryReference);
+			Logging.LogErrorFormat("Could not determine the full path for {0}.\nUnityProj: {1}\nUnityData: {2}", path, projectDirectory, dataDirectory);
 
 			return string.Empty;
+		}
+
+		private static bool StartsWithDirectory(string path, string directoryName)
+		{
+			var comparison = Path.DirectorySeparatorChar == '\\' ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+			return !string.IsNullOrEmpty(directoryName) && path.StartsWith(directoryName, comparison) &&
+			       (path.Length == directoryName.Length || path[directoryName.Length] == '/' || path[directoryName.Length] == '\\');
 		}
 
 		public static string GetPathWithoutMeta(string path)
@@ -709,12 +682,19 @@ namespace AssetLock.Editor
 
 		public static bool IsGitHubUrl(string url)
 		{
-			return url.Contains("github.com");
+			return HasHost(url, "github.com");
 		}
 
 		public static bool IsGitLabUrl(string url)
 		{
-			return url.Contains("gitlab.com");
+			return HasHost(url, "gitlab.com");
+		}
+
+		private static bool HasHost(string url, string host)
+		{
+			return Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
+			       (string.Equals(uri.Host, host, StringComparison.OrdinalIgnoreCase) ||
+			        uri.Host.EndsWith("." + host, StringComparison.OrdinalIgnoreCase));
 		}
 	}
 }

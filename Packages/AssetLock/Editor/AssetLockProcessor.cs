@@ -16,6 +16,8 @@ namespace AssetLock.Editor
 	/// </summary>
 	public class AssetLockProcessor : AssetModificationProcessor
 	{
+		private static bool IsActive => MasterEnable && AssetLockManager.Instance?.IsReady == true;
+
 		private static bool CanOpenForEdit(
 			string[] assetOrMetaFilePaths,
 			List<string> outNotEditablePaths,
@@ -24,7 +26,7 @@ namespace AssetLock.Editor
 		{
 			using var profiler = new Logging.Profiler(message: string.Join('\n', assetOrMetaFilePaths));
 
-			if (!MasterEnable)
+			if (!IsActive)
 			{
 				return true;
 			}
@@ -65,7 +67,7 @@ namespace AssetLock.Editor
 		{
 			using var profiler = new Logging.Profiler(message: string.Join('\n', assetOrMetaFilePaths));
 
-			if (!MasterEnable)
+			if (!IsActive)
 			{
 				return true;
 			}
@@ -94,7 +96,7 @@ namespace AssetLock.Editor
 		{
 			using var profiler = new Logging.Profiler(message: string.Join('\n', paths));
 
-			if (!MasterEnable)
+			if (!IsActive)
 			{
 				return true;
 			}
@@ -128,43 +130,47 @@ namespace AssetLock.Editor
 		{
 			using var profiler = new Logging.Profiler(message: string.Join('\n', paths));
 
-			if (!MasterEnable)
+			if (!IsActive)
 			{
 				return paths;
 			}
 
 			HandleRefresh(StatusQueryOptions.UseCachedIfPossible);
-			List<string> unsaved = new List<string>();
+			HashSet<FileReference> unsaved = new HashSet<FileReference>();
 
 			foreach (var path in GetAllBinaryPaths(paths))
 			{
 				if (!GetLock(path, true, out var info))
 				{
-					unsaved.Add(path.UnityPath);
+					unsaved.Add(path);
 				}
 				else if (info is { locked: true, LockedByMe: false })
 				{
-					unsaved.Add(path.UnityPath);
+					unsaved.Add(path);
 				}
 				else if (!TryAutoLock(info, true, "save"))
 				{
-					unsaved.Add(path.UnityPath);
+					unsaved.Add(path);
 				}
 			}
 
 			if (unsaved.Any())
 			{
-				Logging.LogWarningFormat("Unsaved assets: {0}", string.Join(", ", unsaved));
+				Logging.LogWarningFormat("Unsaved assets: {0}", string.Join(", ", unsaved.Select(file => file.UnityPath)));
+			}
+			else
+			{
+				return paths;
 			}
 
-			return paths.Except(unsaved).ToArray();
+			return paths.Where(path => !unsaved.Contains(FileReference.FromPath(path))).ToArray();
 		}
 
 		private static AssetDeleteResult OnWillDeleteAsset(string assetPath, RemoveAssetOptions options)
 		{
 			using var profiler = new Logging.Profiler(message: assetPath);
 
-			if (!MasterEnable)
+			if (!IsActive)
 			{
 				return AssetDeleteResult.DidNotDelete;
 			}
@@ -192,7 +198,7 @@ namespace AssetLock.Editor
 
 				return AssetDeleteResult.FailedDelete;
 			}
-			else if (TryAutoLock(info, true, "delete"))
+			else if (!info.LockedByMe && !TryAutoLock(info, true, "delete"))
 			{
 				return AssetDeleteResult.FailedDelete;
 			}
@@ -204,7 +210,7 @@ namespace AssetLock.Editor
 		{
 			using var profiler = new Logging.Profiler(message: sourcePath);
 
-			if (!MasterEnable)
+			if (!IsActive)
 			{
 				return AssetMoveResult.DidNotMove;
 			}
@@ -246,7 +252,7 @@ namespace AssetLock.Editor
 		{
 			using var profiler = new Logging.Profiler(message: string.Join('\n', paths));
 
-			if (!MasterEnable)
+			if (!IsActive)
 			{
 				return;
 			}
@@ -268,7 +274,7 @@ namespace AssetLock.Editor
 
 		private static void OnStatusUpdated()
 		{
-			if (!MasterEnable)
+			if (!IsActive)
 			{
 				return;
 			}
@@ -285,7 +291,10 @@ namespace AssetLock.Editor
 
 			if (blocking)
 			{
-				reference.TrackFileAsync().Wait(Constants.DEFAULT_LOCK_TIMEOUT);
+				if (!reference.TrackFileAsync().Wait(Constants.DEFAULT_LOCK_TIMEOUT))
+				{
+					return false;
+				}
 
 				return GetLock(reference, false, out info);
 			}
@@ -299,9 +308,14 @@ namespace AssetLock.Editor
 
 		private static bool TryAutoLock(FileReference reference, bool blocking = true, string action = "modify")
 		{
-			if (!MasterEnable)
+			if (!IsActive)
 			{
 				return false;
+			}
+
+			if (reference.TryGetLock(out var current) && current.LockedByMe)
+			{
+				return true;
 			}
 
 			if (AutoLock)
@@ -312,7 +326,11 @@ namespace AssetLock.Editor
 				}
 				else
 				{
-					reference.LockFileAsync().Wait(Constants.DEFAULT_LOCK_TIMEOUT);
+					if (!reference.LockFileAsync().Wait(Constants.DEFAULT_LOCK_TIMEOUT) ||
+					    !reference.TryGetLock(out var acquired) || !acquired.LockedByMe)
+					{
+						return false;
+					}
 				}
 
 				LogReferenceFormat(

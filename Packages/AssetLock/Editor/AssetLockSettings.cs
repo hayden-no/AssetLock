@@ -13,13 +13,31 @@ namespace AssetLock.Editor
 	/// </summary>
 	internal static class AssetLockSettings
 	{
+		internal static bool TestMode => System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-assetLockTestMode") >= 0;
+
+		// SettingsManager dispatches by repository type. Reimplement the interface
+		// so test settings remain in memory instead of touching EditorPrefs.
+		private sealed class MemorySettingsRepository : UserSettingsRepository, ISettingsRepository
+		{
+			private readonly Dictionary<(System.Type, string), object> m_values = new();
+			void ISettingsRepository.Save() { }
+			void ISettingsRepository.Set<T>(string key, T value) => m_values[(typeof(T), key)] = value;
+			T ISettingsRepository.Get<T>(string key, T fallback) => m_values.TryGetValue((typeof(T), key), out var value) ? (T)value : fallback;
+			bool ISettingsRepository.ContainsKey<T>(string key) => m_values.ContainsKey((typeof(T), key));
+			void ISettingsRepository.Remove<T>(string key) => m_values.Remove((typeof(T), key));
+		}
+
+		private static Settings CreateSettings() => TestMode
+			? new Settings(new ISettingsRepository[] { new MemorySettingsRepository() })
+			: new Settings(Constants.PACKAGE_NAME);
+
 		private static Settings s_projectInstance;
 
-		public static Settings ProjectSettings => s_projectInstance ??= new Settings(Constants.PACKAGE_NAME);
+		public static Settings ProjectSettings => s_projectInstance ??= CreateSettings();
 
 		private static Settings s_userInstance;
 
-		public static Settings UserSettings => s_userInstance ??= new Settings(Constants.PACKAGE_NAME);
+		public static Settings UserSettings => s_userInstance ??= CreateSettings();
 
 		[SettingsProvider]
 		static SettingsProvider ProjectSettingsProvider()
@@ -36,7 +54,7 @@ namespace AssetLock.Editor
 		internal class ALProjectSetting<T> : UserSetting<T>
 		{
 			public ALProjectSetting(string key, T defaultValue)
-				: base(ProjectSettings, key, defaultValue) { }
+				: base(ProjectSettings, key, defaultValue, TestMode ? SettingsScope.User : SettingsScope.Project) { }
 		}
 
 		internal class ALUserSetting<T> : UserSetting<T>

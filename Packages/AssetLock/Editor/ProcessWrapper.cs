@@ -12,10 +12,15 @@ using System.Threading.Tasks;
 
 namespace AssetLock.Editor
 {
+	internal interface IProcessRunner
+	{
+		Task<ProcessResult> RunCommandAsync(params string[] args);
+	}
+
 	/// <summary>
 	/// Helper class for running processes.
 	/// </summary>
-	public class ProcessWrapper
+	public class ProcessWrapper : IProcessRunner
 	{
 		public const string POWERSHELL = "WindowsPowerShell\\v1.0\\powershell.exe";
 		public const string CMD = "cmd.exe";
@@ -225,7 +230,13 @@ namespace AssetLock.Editor
 			using ProcessInstance instance = new ProcessInstance(exePath, workingPath, args);
 
 			instance.StartProcess();
-			instance.m_process.WaitForExit(instance.Timeout);
+			if (!instance.m_process.WaitForExit(instance.Timeout))
+			{
+				instance.m_process.Kill();
+				instance.m_process.WaitForExit();
+				return new ProcessResult(args, -1, instance.m_stdOut.ToString(), "Process timed out.");
+			}
+			instance.m_process.WaitForExit(); // Drain redirected output callbacks.
 
 			int exitCode = -1;
 
@@ -257,7 +268,17 @@ namespace AssetLock.Editor
 			using ProcessInstance instance = new ProcessInstance(exePath, workingPath, args);
 
 			instance.StartProcess();
-			await WaitForExitAsync(instance.m_process, ct);
+			try
+			{
+				await WaitForExitAsync(instance.m_process, ct);
+			}
+			catch (OperationCanceledException)
+			{
+				if (!instance.m_process.HasExited) instance.m_process.Kill();
+				instance.m_process.WaitForExit();
+				throw;
+			}
+			instance.m_process.WaitForExit(); // Drain redirected output callbacks.
 
 			int exitCode = -1;
 
@@ -318,7 +339,7 @@ namespace AssetLock.Editor
 			process.Exited += (sender, args) => tcs.TrySetResult(null);
 			if (cancellationToken != new CancellationToken())
 			{
-				cancellationToken.Register(() => tcs.SetCanceled());
+				cancellationToken.Register(() => tcs.TrySetCanceled());
 			}
 
 			return !process.HasExited ? tcs.Task : Task.CompletedTask;

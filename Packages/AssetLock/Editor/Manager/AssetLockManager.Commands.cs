@@ -110,8 +110,6 @@ namespace AssetLock.Editor.Manager
 			if (!string.IsNullOrEmpty(user))
 			{
 				m_user = user;
-				m_lfsInitialized = true;
-				Logging.LogFormat("Git LFS initialized for user {0}", m_user);
 			}
 			
 			var env = await m_lfsProcess.RunCommandAsync(envCmd);
@@ -126,6 +124,7 @@ namespace AssetLock.Editor.Manager
 			if (TryGetLfsWorkingDirFromEnv(env.StdOut, out var dir))
 			{
 				GitWorkingDirectoryReference = DirectoryReference.FromPath(dir);
+				GitWorkingDirectory.SetValue(dir);
 				gotDir = true;
 			}
 			else
@@ -138,12 +137,12 @@ namespace AssetLock.Editor.Manager
 			if (string.IsNullOrWhiteSpace(GitWorkingDirectory))
 			{
 				GitWorkingDirectory.SetValue(await GetGitWorkingDirectory());
+			}
 
-				if (!gotDir)
-				{
-					GitWorkingDirectoryReference = DirectoryReference.FromPath(GitWorkingDirectory);
-					gotDir = true;
-				}
+			if (!gotDir && !string.IsNullOrWhiteSpace(GitWorkingDirectory))
+			{
+				GitWorkingDirectoryReference = DirectoryReference.FromPath(GitWorkingDirectory);
+				gotDir = true;
 			}
 
 			if (string.IsNullOrWhiteSpace(GitRemoteUrl))
@@ -156,11 +155,16 @@ namespace AssetLock.Editor.Manager
 			
 			if (!gotDir)
 			{
-				GitWorkingDirectoryReference = DirectoryReference.FromPath("failed");
 				Logging.LogError("Failed to get git working directory.");
 			}
 
-			if (ParseFilesOnStartup)
+			if (gotDir && !string.IsNullOrEmpty(m_user))
+			{
+				m_lfsInitialized = true;
+				Logging.LogFormat("Git LFS initialized for user {0}", m_user);
+			}
+
+			if (IsReady && ParseFilesOnStartup)
 			{
 				ParseAll();
 			}
@@ -453,16 +457,27 @@ namespace AssetLock.Editor.Manager
 
 			if (UseHttp)
 			{
-				var (success, _, locks) = await ListLocksHttp(new());
+				var allLocks = new List<LockInfo>();
+				var seenCursors = new HashSet<string>();
+				string cursor = null;
+				do
+				{
+					var (success, nextCursor, locks) = await ListLocksHttp(new ListLocksRequest { Cursor = cursor });
+					if (!success || locks == null)
+					{
+						return null;
+					}
+					allLocks.AddRange(locks);
+					cursor = nextCursor;
+					if (!string.IsNullOrEmpty(cursor) && !seenCursors.Add(cursor))
+					{
+						Logging.LogError("Git LFS returned a repeated lock cursor.");
+						return null;
+					}
+				}
+				while (!string.IsNullOrEmpty(cursor));
 
-				if (success)
-				{
-					return locks.ToList();
-				}
-				else
-				{
-					return new();
-				}
+				return allLocks;
 			}
 			else
 			{

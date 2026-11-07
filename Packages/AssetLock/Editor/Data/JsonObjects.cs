@@ -138,7 +138,7 @@ namespace AssetLock.Editor.Data
 				sb.Append("?");
 				any = true;
 
-				sb.Append($"{pathKey}={Path}");
+				sb.Append($"{pathKey}={System.Uri.EscapeDataString(Path)}");
 			}
 
 			if (!string.IsNullOrWhiteSpace(Id))
@@ -153,7 +153,7 @@ namespace AssetLock.Editor.Data
 					sb.Append("&");
 				}
 
-				sb.Append($"{idKey}={Id}");
+				sb.Append($"{idKey}={System.Uri.EscapeDataString(Id)}");
 			}
 
 			if (!string.IsNullOrWhiteSpace(Cursor))
@@ -168,7 +168,7 @@ namespace AssetLock.Editor.Data
 					sb.Append("&");
 				}
 
-				sb.Append($"{cursorKey}={Cursor}");
+				sb.Append($"{cursorKey}={System.Uri.EscapeDataString(Cursor)}");
 			}
 
 			if (Limit > 0)
@@ -198,7 +198,7 @@ namespace AssetLock.Editor.Data
 					sb.Append("&");
 				}
 
-				sb.Append($"{refKey}={Ref.Name}");
+				sb.Append($"{refKey}={System.Uri.EscapeDataString(Ref.Name)}");
 			}
 
 			return sb.ToString();
