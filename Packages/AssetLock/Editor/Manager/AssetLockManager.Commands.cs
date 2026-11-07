@@ -16,6 +16,7 @@ namespace AssetLock.Editor.Manager
 			Track,
 			Untrack,
 			Lock,
+			WarningAutoLock,
 			Unlock,
 			Update
 		}
@@ -25,16 +26,45 @@ namespace AssetLock.Editor.Manager
 			public CommandKind Kind;
 			public FileReference File;
 			public bool Force;
+			public Action<FileReference, string> Completed;
 
 			public Command(CommandKind kind, FileReference reference, bool force = false)
 			{
 				Kind = kind;
 				File = reference;
 				Force = force;
+				Completed = null;
 			}
 
 			public async Task ExecuteAsync()
 			{
+				if (Kind == CommandKind.WarningAutoLock)
+				{
+					try
+					{
+						if (!File.Exists)
+						{
+							Completed?.Invoke(File, "The file was moved or deleted before it could be locked.");
+							return;
+						}
+						if (!Instance.m_lockRepo.ContainsKey(File)) await Instance.InternalTrackFileAsync(File);
+						var current = Instance.m_lockRepo[File];
+						if (current.locked && !current.LockedByMe)
+						{
+							Completed?.Invoke(File, $"Locked by {current.owner ?? "another user"}.");
+							return;
+						}
+						if (!current.LockedByMe) await Instance.InternalLockFileAsync(File);
+						Completed?.Invoke(File, Instance.m_lockRepo.TryGetValue(File, out var acquired) && acquired.LockedByMe
+							? null : "The lock server did not grant the lock.");
+					}
+					catch (Exception error)
+					{
+						Completed?.Invoke(File, $"Lock request failed ({error.GetType().Name}).");
+						throw;
+					}
+					return;
+				}
 				if (!File.Exists)
 				{
 					throw new FileNotFoundException("File not found", File.GitPath);
@@ -98,10 +128,19 @@ namespace AssetLock.Editor.Manager
 		/// </summary>
 		private async Task InitGitLfs()
 		{
+			m_initializing = true;
+			try { await InitGitLfsCore(); }
+			finally { m_initializing = false; }
+		}
+
+		private async Task InitGitLfsCore()
+		{
 			const string installCmd = "install";
 			const string envCmd = "env";
 
-			var init = await m_lfsProcess.RunCommandAsync(installCmd);
+			// Git LFS otherwise tries to replace our cooperative pre-push wrapper.
+			bool wrapped = !TestMode && await PushUnlockPrompt.IsInstalledAsync();
+			var init = wrapped ? await m_lfsProcess.RunCommandAsync(installCmd, "--skip-repo") : await m_lfsProcess.RunCommandAsync(installCmd);
 			CheckForFailedHooks(init);
 			ThrowOnProcessError(init, "failed to initialize git-lfs");
 

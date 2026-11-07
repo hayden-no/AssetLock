@@ -1,6 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using AssetLock.Editor.UI;
 using UnityEditor;
 using UnityEditor.SettingsManagement;
@@ -63,6 +65,20 @@ namespace AssetLock.Editor
 				: base(UserSettings, key, defaultValue, SettingsScope.User) { }
 		}
 
+		internal static string ProjectUserKey(string key, string projectPath = null)
+		{
+			string path = System.IO.Path.GetFullPath(projectPath ?? System.IO.Path.GetDirectoryName(UnityEngine.Application.dataPath))
+				.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar);
+			if (System.IO.Path.DirectorySeparatorChar == '\\') path = path.ToUpperInvariant();
+			using var hash = SHA256.Create();
+			return Constants.PACKAGE_NAME + ".Project." + System.BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(path))).Replace("-", "") + "." + key;
+		}
+
+		internal class ALProjectUserSetting<T> : ALUserSetting<T>
+		{
+			public ALProjectUserSetting(string key, T defaultValue) : base(ProjectUserKey(key), defaultValue) { }
+		}
+
 	#region User Settings
 		
 		internal static ALUserSetting<bool> IsFirstTimeExperience = new(nameof(IsFirstTimeExperience), true);
@@ -70,6 +86,12 @@ namespace AssetLock.Editor
 		internal static ALUserSetting<bool> MasterEnable = new(nameof(MasterEnable), true);
 
 		internal static ALUserSetting<bool> AutoLock = new(nameof(AutoLock), true);
+
+		internal static ALUserSetting<bool> UseLegacyBrowser = new(nameof(UseLegacyBrowser), false);
+		internal static ALUserSetting<bool> WarnOnly = new(nameof(WarnOnly), false);
+		internal static ALUserSetting<bool> SuppressAutoLockFailureDialogs = new(nameof(SuppressAutoLockFailureDialogs), false);
+		internal static ALProjectUserSetting<bool> EnablePushUnlockPrompts = new(nameof(EnablePushUnlockPrompts), false);
+		internal static ALUserSetting<bool> SuppressPushUnlockPrompts = new(nameof(SuppressPushUnlockPrompts), false);
 		
 		internal static ALUserSetting<bool> ParseFilesOnStartup = new(nameof(ParseFilesOnStartup), true);
 		
@@ -112,22 +134,23 @@ namespace AssetLock.Editor
 			TryGetDefaultGitLfsPath(out var path) ? path : Constants.DEFAULT_GIT_LFS_EXE
 		);
 		
-		internal static ALUserSetting<CredentialsKind> CredentialsType = new(
+		internal static ALProjectUserSetting<bool> UseGitCredentialHelper = new(nameof(UseGitCredentialHelper), true);
+		internal static ALProjectUserSetting<CredentialsKind> CredentialsType = new(
 			nameof(CredentialsType),
 			CredentialsKind.UserPass
 		);
 		
 		internal static ALUserSetting<string> GitWorkingDirectory = new(nameof(GitWorkingDirectory), string.Empty);
 		
-		internal static ALUserSetting<string> GitHubRemoteAuthToken = new(nameof(GitHubRemoteAuthToken), string.Empty);
+		internal static ALProjectUserSetting<string> GitHubRemoteAuthToken = new(nameof(GitHubRemoteAuthToken), string.Empty);
 		
-		internal static ALUserSetting<string> GitLabRemoteUsername = new(nameof(GitLabRemoteUsername), string.Empty);
+		internal static ALProjectUserSetting<string> GitLabRemoteUsername = new(nameof(GitLabRemoteUsername), string.Empty);
 		
-		internal static ALUserSetting<string> GitLabRemoteAuthToken = new(nameof(GitLabRemoteAuthToken), string.Empty);
+		internal static ALProjectUserSetting<string> GitLabRemoteAuthToken = new(nameof(GitLabRemoteAuthToken), string.Empty);
 		
-		internal static ALUserSetting<string> CredentialsUsername = new(nameof(CredentialsUsername), string.Empty);
+		internal static ALProjectUserSetting<string> CredentialsUsername = new(nameof(CredentialsUsername), string.Empty);
 		
-		internal static ALUserSetting<string> CredentialsPassword = new(nameof(CredentialsPassword), string.Empty);
+		internal static ALProjectUserSetting<string> CredentialsPassword = new(nameof(CredentialsPassword), string.Empty);
 		
 	#endregion
 
@@ -146,6 +169,7 @@ namespace AssetLock.Editor
 		internal static ALProjectSetting<bool> TrackNonBinaryFiles = new(nameof(TrackNonBinaryFiles), false);
 		
 		internal static ALProjectSetting<string> GitRemoteUrl = new(nameof(GitRemoteUrl), string.Empty);
+		internal static ALProjectSetting<List<string>> PushUnlockBranches = new(nameof(PushUnlockBranches), new List<string> { "main", "master" });
 		internal static ALProjectSetting<string> GitLfsServerUrl = new(nameof(GitLfsServerUrl), string.Empty);
 		internal static ALProjectSetting<string> GitLfsServerLocksApiUrl = new(nameof(GitLfsServerLocksApiUrl), string.Empty);
 

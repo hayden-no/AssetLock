@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using AssetLock.Editor.Data;
 using AssetLock.Editor.Manager;
@@ -40,7 +41,7 @@ namespace AssetLock.Editor.Tests
         public void FailedInitializationDoesNotActivateCallbacks()
         {
             Lfs.Run = args => FakeProcess.Result(args, exitCode: 1, error: "failure");
-            UnityEngine.TestTools.LogAssert.Expect(LogType.Error, "[AssetLock] failed to initialize git-lfs\nfailure");
+            UnityEngine.TestTools.LogAssert.Expect(LogType.Error, new Regex("failed to initialize git-lfs\\nfailure"));
             Assert.Throws<Exception>(() => Initialize());
             Assert.That(Manager.IsReady, Is.False);
             Assert.That((bool)Invoke("IsOpenForEdit", new[] { AssetPath }, new List<string>(), StatusQueryOptions.UseCachedIfPossible), Is.True);
@@ -220,12 +221,27 @@ namespace AssetLock.Editor.Tests
             Initialize();
             Lfs.RunAsync = _ => Task.FromException<ProcessResult>(new TimeoutException());
             var waiting = Manager.RefreshAsync();
-            LogAssert.Expect(LogType.Error, "[AssetLock] Refresh failed (TimeoutException).");
+            LogAssert.Expect(LogType.Error, new Regex("Refresh failed \\(TimeoutException\\)"));
             typeof(AssetLockManager).GetMethod("EditorLoop", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(Manager, null);
             var deadline = DateTime.UtcNow.AddSeconds(5);
             while (!waiting.IsCompleted && DateTime.UtcNow < deadline) yield return null;
             Assert.That(waiting.IsFaulted, Is.True);
             Assert.That(waiting.Exception.InnerException, Is.TypeOf<TimeoutException>());
+
+            Assert.That(Manager.AutomaticRefreshPaused, Is.True);
+            int calls = Lfs.Calls.Count;
+            Manager.RequestAutomaticRefresh(true);
+            Invoke("IsOpenForEdit", Array.Empty<string>(), new List<string>(), StatusQueryOptions.ForceUpdate);
+            typeof(AssetLockManager).GetMethod("EditorLoop", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(Manager, null);
+            Assert.That(Lfs.Calls.Count, Is.EqualTo(calls));
+
+            Lfs.RunAsync = args => Task.FromResult(FakeProcess.Result(args, "[]"));
+            var retry = Manager.RefreshAsync();
+            typeof(AssetLockManager).GetMethod("EditorLoop", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(Manager, null);
+            deadline = DateTime.UtcNow.AddSeconds(5);
+            while (!retry.IsCompleted && DateTime.UtcNow < deadline) yield return null;
+            Assert.That(retry.IsCompletedSuccessfully, Is.True);
+            Assert.That(Manager.AutomaticRefreshPaused, Is.False);
         }
 
         private static void CreateAsset()

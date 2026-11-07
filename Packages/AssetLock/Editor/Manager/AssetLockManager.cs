@@ -34,6 +34,8 @@ namespace AssetLock.Editor.Manager
 		internal string User => m_user;
 		private bool m_lfsInitialized;
 		private bool m_lfsFailed;
+		private bool m_initializing;
+		internal bool IsInitializing => !m_disposed && m_initializing;
 
 		internal DirectoryReference UnityProjectDirectoryReference { get; }
 		// Assets directory
@@ -129,8 +131,8 @@ namespace AssetLock.Editor.Manager
 			UnityDataDirectoryReference = DirectoryReference.FromPath(Path.GetFullPath(Application.dataPath));
 			UnityProjectDirectoryReference = UnityDataDirectoryReference.Parent;
 
-			m_gitProcess = new ProcessWrapper(GitPath);
-			m_lfsProcess = new ProcessWrapper(GitLfsPath);
+			m_gitProcess = new ProcessWrapper(GitPath) { WorkingPath = UnityProjectDirectoryReference.AbsolutePath };
+			m_lfsProcess = new ProcessWrapper(GitLfsPath) { WorkingPath = UnityProjectDirectoryReference.AbsolutePath };
 
 			EditorApplication.projectWindowItemOnGUI += ProjectWindowGUI.DrawOnProjectWindowGUI;
 			EditorApplication.update += EditorLoop;
@@ -171,6 +173,7 @@ namespace AssetLock.Editor.Manager
 		///<inheritdoc/>
 		public void Dispose()
 		{
+			CancelWarningAutoLocks("AssetLock was stopped before the lock could be acquired.");
 			if (m_lockRepo != null)
 			{
 				s_repoSerialized.SetValue(m_lockRepo?.Serialize(), true);

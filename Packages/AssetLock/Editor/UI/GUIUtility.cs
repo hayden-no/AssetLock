@@ -16,6 +16,50 @@ namespace AssetLock.Editor.UI
 	{
 		private static HashSet<string> s_keywords = null;
 
+		// Based on wildcmp by Jack Handy: https://www.codeproject.com/Articles/1088/Wildcard-string-compare-globbing
+		internal static bool IsMatchWithStarWildcard(ReadOnlySpan<char> input, ReadOnlySpan<char> pattern)
+		{
+			int inputPos = 0, inputPosSaved = -1;
+			int patternPos = 0, patternPosSaved = -1;
+
+			while (inputPos < input.Length)
+			{
+				if (patternPos < pattern.Length && pattern[patternPos] == '*')
+				{
+					inputPosSaved = inputPos;
+					patternPosSaved = ++patternPos;
+				}
+				else if (patternPos < pattern.Length &&
+				         (pattern[patternPos] == input[inputPos] ||
+				          char.ToUpperInvariant(pattern[patternPos]) == char.ToUpperInvariant(input[inputPos])))
+				{
+					inputPos++;
+					patternPos++;
+				}
+				else if (patternPosSaved == -1)
+				{
+					return false;
+				}
+				else
+				{
+					inputPos = ++inputPosSaved;
+					patternPos = patternPosSaved;
+				}
+			}
+
+			while (patternPos < pattern.Length && pattern[patternPos] == '*') patternPos++;
+			return patternPos == pattern.Length;
+		}
+
+		internal static bool MatchesBrowserSearch(string input, string pattern)
+		{
+			if (string.IsNullOrEmpty(pattern)) return true;
+			if (input == null) return false;
+			return pattern.IndexOf('*') >= 0
+				? IsMatchWithStarWildcard(input.AsSpan(), pattern.AsSpan())
+				: input.IndexOf(pattern, StringComparison.OrdinalIgnoreCase) >= 0;
+		}
+
 		public static bool MatchSearchGroups(string searchContext, string label)
 		{
 			if (s_keywords != null)
@@ -256,6 +300,7 @@ namespace AssetLock.Editor.UI
 			{
 				EditorGUI.BeginChangeCheck();
 				var list = setting.value;
+				bool listChanged = false;
 
 				for (var i = 0; i < list.Count; i++)
 				{
@@ -266,6 +311,7 @@ namespace AssetLock.Editor.UI
 						if (GUILayout.Button(new GUIContent("X", $"Remove '{list[i]}'"), GUILayout.Width(20)))
 						{
 							list.RemoveAt(i);
+							listChanged = true;
 						}
 					}
 				}
@@ -277,10 +323,12 @@ namespace AssetLock.Editor.UI
 					if (GUILayout.Button("Add", GUILayout.Width(50)))
 					{
 						list.Add("");
+						listChanged = true;
 					}
 				}
 
-				if (EditorGUI.EndChangeCheck())
+				bool fieldChanged = EditorGUI.EndChangeCheck();
+				if (fieldChanged || listChanged)
 				{
 					setting.ApplyModifiedProperties();
 				}

@@ -40,6 +40,14 @@ namespace AssetLock.Editor.Manager
 		private async Task<HttpResult> SendAsync(UnityWebRequest request)
 		{
 			request.timeout = 30;
+			if (UseGitCredentialHelper)
+			{
+				var identity = CredentialIdentities.Current;
+				var scope = GitCredentialClient.ScopeFor(request.url, identity);
+				var credential = await GitCredentialClient.GetForRequestAsync(scope, identity);
+				request.SetRequestHeader("Authorization", $"Basic {BasicAuthHeader(credential.Username, credential.Password)}");
+				request.redirectLimit = 0;
+			}
 			if (HttpTransport != null)
 			{
 				return await HttpTransport(request);
@@ -62,7 +70,7 @@ namespace AssetLock.Editor.Manager
 		
 		private string BasicAuthHeader(string username, string password)
 		{
-			byte[] bytes = Encoding.ASCII.GetBytes($"{username}:{password}");
+			byte[] bytes = Encoding.UTF8.GetBytes($"{username}:{password}");
 
 			return Convert.ToBase64String(bytes);
 		}
@@ -70,12 +78,13 @@ namespace AssetLock.Editor.Manager
 		internal void AppendHeaders(UnityWebRequest request)
 		{
 			request.SetRequestHeader("Accept", CONTENT_TYPE);
+			if (UseGitCredentialHelper) return;
 
-			if (IsGitHubUrl(request.url))
+			if (CredentialsType.value == CredentialsKind.GitHub)
 			{
 				request.SetRequestHeader("Authorization", BearAuthHeader(GitHubRemoteAuthToken));
 			}
-			else if (IsGitLabUrl(request.url))
+			else if (CredentialsType.value == CredentialsKind.GitLab)
 			{
 				request.SetRequestHeader("Authorization", $"Basic {BasicAuthHeader(GitLabRemoteUsername, GitLabRemoteAuthToken)}");
 			}
@@ -328,8 +337,7 @@ namespace AssetLock.Editor.Manager
 		private static void HandleUnknownError(UnityWebRequest request)
 		{
 			Logging.LogErrorFormat("[HTTP] Failed to access remote \n{0}\n", GetWebRequestLogMessage(request));
-			Logging.LogWarning("Disabling HTTP mode.");
-			UseHttp.SetValue(false, true);
+			Logging.LogWarning("HTTP lock requests failed. Check the server and credentials before retrying.");
 		}
 
 		private static string GetResponseLogMessage(HttpResult response) =>

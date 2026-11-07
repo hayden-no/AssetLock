@@ -39,11 +39,16 @@ namespace AssetLock.Editor.Tests
             IsFirstTimeExperience.SetValue(false);
             ParseFilesOnStartup.SetValue(false);
             AutoLock.SetValue(false);
+            WarnOnly.SetValue(false);
+            SuppressAutoLockFailureDialogs.SetValue(false);
+            UseLegacyBrowser.SetValue(false);
             TrackNonBinaryFiles.SetValue(true);
             TrackedFileEndings.SetValue(new List<string> { ".bin", ".asset" });
             GitRemoteUrl.SetValue("https://example.test/repo");
             GitWorkingDirectory.SetValue("");
             UseHttp.SetValue(false);
+            UseGitCredentialHelper.SetValue(false);
+            GitCredentialClient.TestCommand = null;
             LogHttp.SetValue(false);
             var project = Directory.GetParent(Application.dataPath).FullName;
             Git = new FakeProcess { Run = args => FakeProcess.Result(args, "tester\n") };
@@ -59,6 +64,7 @@ namespace AssetLock.Editor.Tests
         public void TearDownManager()
         {
             AssetLockManager.TestFactory = null;
+            GitCredentialClient.TestCommand = null;
             AssetLockManager.SetTestInstance(null);
         }
     }

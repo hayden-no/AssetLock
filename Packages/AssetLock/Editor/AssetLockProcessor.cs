@@ -5,6 +5,8 @@ using AssetLock.Editor.Data;
 using AssetLock.Editor.Manager;
 using JetBrains.Annotations;
 using UnityEditor;
+using UnityEditorInternal;
+using UnityEngine;
 using static AssetLock.Editor.AssetLockSettings;
 using static AssetLock.Editor.AssetLockUtility;
 using FileMode = UnityEditor.VersionControl.FileMode;
@@ -17,6 +19,9 @@ namespace AssetLock.Editor
 	public class AssetLockProcessor : AssetModificationProcessor
 	{
 		private static bool IsActive => MasterEnable && AssetLockManager.Instance?.IsReady == true;
+		private static readonly Dictionary<string, double> s_autoLockTimes = new();
+		private static readonly HashSet<string> s_autoLockPending = new();
+		private static readonly Dictionary<string, string> s_dialogFailures = new();
 
 		private static bool CanOpenForEdit(
 			string[] assetOrMetaFilePaths,
@@ -28,6 +33,11 @@ namespace AssetLock.Editor
 
 			if (!IsActive)
 			{
+				return true;
+			}
+			if (WarnOnly)
+			{
+				WarnForPaths(assetOrMetaFilePaths, "open", false);
 				return true;
 			}
 
@@ -71,6 +81,11 @@ namespace AssetLock.Editor
 			{
 				return true;
 			}
+			if (WarnOnly)
+			{
+				WarnForPaths(assetOrMetaFilePaths, "edit", true);
+				return true;
+			}
 
 			HandleRefresh(statusQueryOptions);
 			bool result = true;
@@ -98,6 +113,11 @@ namespace AssetLock.Editor
 
 			if (!IsActive)
 			{
+				return true;
+			}
+			if (WarnOnly)
+			{
+				WarnForPaths(paths, "edit", true, true);
 				return true;
 			}
 
@@ -132,6 +152,11 @@ namespace AssetLock.Editor
 
 			if (!IsActive)
 			{
+				return paths;
+			}
+			if (WarnOnly)
+			{
+				WarnForPaths(paths, "save", true, true);
 				return paths;
 			}
 
@@ -174,6 +199,11 @@ namespace AssetLock.Editor
 			{
 				return AssetDeleteResult.DidNotDelete;
 			}
+			if (WarnOnly)
+			{
+				WarnForPaths(new[] { assetPath }, "delete", true, true);
+				return AssetDeleteResult.DidNotDelete;
+			}
 
 			HandleRefresh(StatusQueryOptions.UseCachedIfPossible);
 			var path = FileReference.FromPath(assetPath);
@@ -214,6 +244,11 @@ namespace AssetLock.Editor
 			{
 				return AssetMoveResult.DidNotMove;
 			}
+			if (WarnOnly)
+			{
+				WarnForPaths(new[] { sourcePath }, "move", true, true);
+				return AssetMoveResult.DidNotMove;
+			}
 
 			HandleRefresh(StatusQueryOptions.UseCachedIfPossible);
 			var path = FileReference.FromPath(sourcePath);
@@ -252,7 +287,7 @@ namespace AssetLock.Editor
 		{
 			using var profiler = new Logging.Profiler(message: string.Join('\n', paths));
 
-			if (!IsActive)
+			if (!IsActive || AssetLockManager.Instance.AutomaticRefreshPaused)
 			{
 				return;
 			}
@@ -279,7 +314,7 @@ namespace AssetLock.Editor
 				return;
 			}
 
-			AssetLockManager.Instance.Refresh();
+			AssetLockManager.Instance.RequestAutomaticRefresh();
 		}
 
 		private static bool GetLock(FileReference reference, bool blocking, out LockInfo info)
@@ -288,6 +323,7 @@ namespace AssetLock.Editor
 			{
 				return true;
 			}
+			if (AssetLockManager.Instance.AutomaticRefreshPaused) return false;
 
 			if (blocking)
 			{
@@ -306,6 +342,57 @@ namespace AssetLock.Editor
 			return false;
 		}
 
+		private static void WarnForPaths(string[] paths, string action, bool requireOwned, bool autoLock = false)
+		{
+			AssetLockManager.Instance.RequestAutomaticRefresh();
+			foreach (var file in GetAllBinaryPaths(paths))
+			{
+				bool known = file.TryGetLock(out var info);
+				if (known && info.LockedByMe)
+				{
+					s_autoLockTimes.Remove(file.AbsolutePath);
+					continue;
+				}
+				if (autoLock && AutoLock && !s_autoLockPending.Contains(file.AbsolutePath))
+				{
+					double now = EditorApplication.timeSinceStartup;
+					if (s_autoLockTimes.TryGetValue(file.AbsolutePath, out var lastAttempt) && now - lastAttempt < 15) continue;
+					if (s_autoLockTimes.Count >= 1024) s_autoLockTimes.Clear();
+					s_autoLockTimes[file.AbsolutePath] = now;
+					if (AssetLockManager.Instance.AutomaticRefreshPaused)
+					{
+						AutoLockCompleted(file, "Lock refresh is paused. Check credentials and refresh to retry.");
+					}
+					else
+					{
+						s_autoLockPending.Add(file.AbsolutePath);
+						AssetLockManager.Instance.QueueWarningAutoLock(file, AutoLockCompleted);
+					}
+				}
+			}
+		}
+
+		private static void AutoLockCompleted(FileReference file, string failure)
+		{
+			s_autoLockPending.Remove(file.AbsolutePath);
+			InternalEditorUtility.RepaintAllViews();
+			if (failure == null || SuppressAutoLockFailureDialogs || Application.isBatchMode || TestMode) return;
+			s_dialogFailures[file.UnityPath] = failure;
+			EditorApplication.delayCall -= ShowAutoLockFailures;
+			EditorApplication.delayCall += ShowAutoLockFailures;
+		}
+
+		private static void ShowAutoLockFailures()
+		{
+			if (s_dialogFailures.Count == 0) return;
+			var details = string.Join("\n", s_dialogFailures.Select(pair => $"{pair.Key}: {pair.Value}"));
+			s_dialogFailures.Clear();
+			if (SuppressAutoLockFailureDialogs) return;
+			if (EditorUtility.DisplayDialogComplex("AssetLock: Automatic Lock Failed",
+			    "Editing is allowed, but these files could not be locked:\n\n" + details, "OK", "Don't show again", "") == 1)
+				SuppressAutoLockFailureDialogs.SetValue(true);
+		}
+
 		private static bool TryAutoLock(FileReference reference, bool blocking = true, string action = "modify")
 		{
 			if (!IsActive)
@@ -317,6 +404,7 @@ namespace AssetLock.Editor
 			{
 				return true;
 			}
+			if (AssetLockManager.Instance.AutomaticRefreshPaused) return false;
 
 			if (AutoLock)
 			{
@@ -361,15 +449,15 @@ namespace AssetLock.Editor
 			switch (option)
 			{
 				case StatusQueryOptions.ForceUpdate:
-					AssetLockManager.Instance.ForceRefresh();
+					AssetLockManager.Instance.RequestAutomaticRefresh(true);
 
 					break;
 				case StatusQueryOptions.UseCachedIfPossible:
-					AssetLockManager.Instance.Refresh();
+					AssetLockManager.Instance.RequestAutomaticRefresh();
 
 					break;
 				case StatusQueryOptions.UseCachedAsync:
-					AssetLockManager.Instance.Refresh();
+					AssetLockManager.Instance.RequestAutomaticRefresh();
 
 					break;
 				default:
@@ -413,6 +501,39 @@ namespace AssetLock.Editor
 			else
 			{
 				Logging.LogWarningFormat(format, args);
+			}
+		}
+	}
+
+	[InitializeOnLoad]
+	internal static class AssetLockInspectorWarning
+	{
+		static AssetLockInspectorWarning() => UnityEditor.Editor.finishedDefaultHeaderGUI += Draw;
+
+		internal static string GetWarning(FileReference file)
+		{
+			if (!MasterEnable || !WarnOnly || AssetLockManager.Instance?.IsReady != true || !ShouldTrack(file)) return null;
+			if (!file.TryGetLock(out var info))
+				return AssetLockManager.Instance.AutomaticRefreshPaused ? "Lock status is unavailable because refresh is paused." : "Lock status is not yet available.";
+			if (info.LockedByMe) return null;
+			return info.locked ? $"Locked by {info.owner ?? "another user"}. Editing is allowed in warning mode." : "Not locked by you. Editing is allowed in warning mode.";
+		}
+
+		private static void Draw(UnityEditor.Editor editor)
+		{
+			if (!MasterEnable || !WarnOnly || AssetLockManager.Instance?.IsReady != true) return;
+			var paths = new HashSet<string>();
+			foreach (var target in editor.targets)
+			{
+				if (target == null || target is Component) continue;
+				var path = AssetDatabase.GetAssetPath(target);
+				if (string.IsNullOrEmpty(path) && target is GameObject gameObject) path = gameObject.scene.path;
+				if (!string.IsNullOrEmpty(path)) paths.Add(path);
+			}
+			foreach (var path in paths)
+			{
+				var message = GetWarning(FileReference.FromPath(path));
+				if (message != null) EditorGUILayout.HelpBox($"AssetLock: {path}\n{message}", MessageType.Warning);
 			}
 		}
 	}

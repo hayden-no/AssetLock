@@ -14,6 +14,12 @@ namespace AssetLock.Editor.Manager
 		private double m_lastUpdate;
 		private double m_refreshTimer;
 		private long m_refreshing;
+		private bool m_refreshRequested;
+		private bool m_hasRefreshed;
+		private bool m_processingCommands;
+		internal bool AutomaticRefreshPaused { get; private set; }
+		internal bool HasPendingCommands => m_processingCommands || !m_commandQueue.IsEmpty;
+		internal bool IsRefreshPending => Refreshing || m_refreshRequested || !m_hasRefreshed;
 
 		private bool Refreshing
 		{
@@ -30,6 +36,7 @@ namespace AssetLock.Editor.Manager
 				return;
 			}
 
+			m_refreshRequested = true;
 			m_refreshTimer = delay;
 		}
 
@@ -65,11 +72,12 @@ namespace AssetLock.Editor.Manager
 				else tcm.TrySetException(failure);
 			}
 			EditorApplication.RepaintProjectWindow();
+			UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
 		}
 
 		private async void EditorLoop()
 		{
-			if (!MasterEnable || !IsReady)
+			if (!MasterEnable || !IsReady || AutomaticRefreshPaused)
 			{
 				return;
 			}
@@ -86,9 +94,32 @@ namespace AssetLock.Editor.Manager
 			}
 			catch (System.Exception error)
 			{
-				Logging.LogErrorFormat("Refresh failed ({0}).", error.GetType().Name);
-				EndRefresh(error);
+				FailRefresh(error);
 			}
+		}
+
+		private void FailRefresh(System.Exception error)
+		{
+			AutomaticRefreshPaused = true;
+			CancelWarningAutoLocks("Lock refresh is paused. Check credentials and refresh to retry.");
+			Logging.LogErrorFormat("Refresh failed ({0}). Automatic refresh is paused; check Git credentials and select Refresh to retry.", error.GetType().Name);
+			EndRefresh(error);
+		}
+
+		private void CancelWarningAutoLocks(string reason)
+		{
+			int count = m_commandQueue.Count;
+			for (int i = 0; i < count && m_commandQueue.TryDequeue(out var command); i++)
+			{
+				if (command.Kind == CommandKind.WarningAutoLock) command.Completed?.Invoke(command.File, reason);
+				else m_commandQueue.Enqueue(command);
+			}
+		}
+
+		private async Task CompleteForcedRefreshAsync(Task task)
+		{
+			try { await task; EndRefresh(); }
+			catch (System.Exception error) { FailRefresh(error); }
 		}
 
 		internal async Task InnerLoopAsync()
@@ -96,6 +127,7 @@ namespace AssetLock.Editor.Manager
 			using var profiler = new Logging.Profiler();
 			
 			Refreshing = true;
+			m_refreshRequested = false;
 
 			try
 			{
@@ -103,6 +135,7 @@ namespace AssetLock.Editor.Manager
 				var locks = await InternalRefreshAllLocksAsync();
 				if (locks == null) throw new System.InvalidOperationException("Failed to refresh Git LFS locks.");
 				m_lockRepo.Update(locks);
+				m_hasRefreshed = true;
 			}
 			finally
 			{
@@ -134,10 +167,15 @@ namespace AssetLock.Editor.Manager
 		// TODO: merge commands by dependency and run them in parallel
 		private async Task HandleCommandsAsync()
 		{
-			while (m_commandQueue.TryDequeue(out var command))
+			m_processingCommands = true;
+			try
 			{
-				await command.ExecuteAsync();
+				while (m_commandQueue.TryDequeue(out var command))
+				{
+					await command.ExecuteAsync();
+				}
 			}
+			finally { m_processingCommands = false; }
 		}
 	}
 }

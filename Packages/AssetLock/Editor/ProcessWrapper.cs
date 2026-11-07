@@ -26,6 +26,10 @@ namespace AssetLock.Editor
 		public const string CMD = "cmd.exe";
 
 		public const int PROCESS_TIMEOUT_MS = 5000;
+		internal const int REMOTE_PROCESS_TIMEOUT_MS = 120000;
+
+		internal static bool IsRemoteCommand(string[] args) => args.Length > 0 &&
+			(args[0] == "locks" || args[0] == "lock" || args[0] == "unlock");
 
 		public readonly string ExePath;
 		public string WorkingPath { get; set; } = Environment.CurrentDirectory;
@@ -83,8 +87,8 @@ namespace AssetLock.Editor
 			}
 			else
 			{
-				LastCommand = string.Join(" ", args);
 				result = ProcessInstance.Run(ExePath, WorkingPath, args);
+				LastCommand = string.Join(" ", args);
 				LastRun = DateTime.Now;
 				m_lastResult = result;
 			}
@@ -118,10 +122,10 @@ namespace AssetLock.Editor
 			}
 			else
 			{
-				LastCommand = string.Join(" ", args);
-				result = AssetLockSettings.ForceSynchronousProcessHandling
+				result = AssetLockSettings.ForceSynchronousProcessHandling && !IsRemoteCommand(args)
 					? ProcessInstance.Run(ExePath, WorkingPath, args)
 					: await ProcessInstance.RunAsync(ExePath, WorkingPath, ct, args);
+				LastCommand = string.Join(" ", args);
 				LastRun = DateTime.Now;
 				m_lastResult = result;
 			}
@@ -148,7 +152,7 @@ namespace AssetLock.Editor
 
 		private bool ShouldRunAgain(string[] args)
 		{
-			return !IsSameCommand(args) || TimeSinceLastRun() > PROCESS_TIMEOUT_MS;
+			return !IsSameCommand(args) || m_lastResult.ExitCode != 0 || TimeSinceLastRun() > PROCESS_TIMEOUT_MS;
 		}
 	}
 
@@ -232,8 +236,8 @@ namespace AssetLock.Editor
 			instance.StartProcess();
 			if (!instance.m_process.WaitForExit(instance.Timeout))
 			{
-				instance.m_process.Kill();
-				instance.m_process.WaitForExit();
+				try { instance.m_process.Kill(); } catch (InvalidOperationException) { }
+				instance.m_process.WaitForExit(1000);
 				return new ProcessResult(args, -1, instance.m_stdOut.ToString(), "Process timed out.");
 			}
 			instance.m_process.WaitForExit(); // Drain redirected output callbacks.
@@ -263,7 +267,11 @@ namespace AssetLock.Editor
 			params string[] args
 		)
 		{
-			ct = ct == CancellationToken.None ? new CancellationTokenSource(ProcessWrapper.PROCESS_TIMEOUT_MS).Token : ct;
+			using var timeout = ct == CancellationToken.None
+				? new CancellationTokenSource(ProcessWrapper.IsRemoteCommand(args)
+					? ProcessWrapper.REMOTE_PROCESS_TIMEOUT_MS : ProcessWrapper.PROCESS_TIMEOUT_MS)
+				: null;
+			if (timeout != null) ct = timeout.Token;
 
 			using ProcessInstance instance = new ProcessInstance(exePath, workingPath, args);
 
@@ -274,8 +282,9 @@ namespace AssetLock.Editor
 			}
 			catch (OperationCanceledException)
 			{
-				if (!instance.m_process.HasExited) instance.m_process.Kill();
-				instance.m_process.WaitForExit();
+				try { if (!instance.m_process.HasExited) instance.m_process.Kill(); }
+				catch (InvalidOperationException) { }
+				instance.m_process.WaitForExit(1000);
 				throw;
 			}
 			instance.m_process.WaitForExit(); // Drain redirected output callbacks.

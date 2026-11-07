@@ -74,7 +74,7 @@ namespace AssetLock.Editor
 
 		public static class Logging
 		{
-			const string LOG_PREFIX = "[AssetLock] ";
+			const string LOG_PREFIX = "<b><color=cyan>[AssetLock]</color></b> ";
 
 			[HideInCallstack]
 			static string GetMessage(string message)

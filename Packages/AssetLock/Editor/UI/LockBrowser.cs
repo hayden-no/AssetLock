@@ -33,6 +33,33 @@ namespace AssetLock.Editor.UI
 		[MenuItem(Constants.BROWSER_MENU_PATH)]
 		private static void ShowWindow()
 		{
+			if (!UseLegacyBrowser)
+			{
+				LockBrowserToolkit.Open();
+				return;
+			}
+			OpenLegacy();
+		}
+
+		internal static void ApplyBrowserPreference()
+		{
+			var legacy = Resources.FindObjectsOfTypeAll<LockBrowser>();
+			var modern = Resources.FindObjectsOfTypeAll<LockBrowserToolkit>();
+			if (legacy.Length == 0 && modern.Length == 0) return;
+			if (UseLegacyBrowser)
+			{
+				foreach (var window in modern) window.Close();
+				OpenLegacy();
+			}
+			else
+			{
+				foreach (var window in legacy) window.Close();
+				LockBrowserToolkit.Open();
+			}
+		}
+
+		private static void OpenLegacy()
+		{
 			var window = GetWindow<LockBrowser>();
 			window.titleContent = EditorGUIUtility.TrTextContentWithIcon(
 				Constants.BROWSER_TITLE,
@@ -51,9 +78,13 @@ namespace AssetLock.Editor.UI
 
 		private void InfoGUI()
 		{
-			if (AssetLockManager.Instance is null || !MasterEnable)
+			if (AssetLockManager.Instance?.IsReady != true || !MasterEnable)
 			{
 				return;
+			}
+			if (AssetLockManager.Instance.AutomaticRefreshPaused)
+			{
+				EditorGUILayout.HelpBox("Automatic refresh paused. Check Git credentials, then select Refresh All to retry.", MessageType.Warning);
 			}
 			
 			GUIContent labelContent = new GUIContent("File Count:");
@@ -119,8 +150,9 @@ namespace AssetLock.Editor.UI
 			GUIContent expandAllLabel = new GUIContent("Expand All", "Expand all directories");
 			GUIContent collapseAllLabel = new GUIContent("Collapse All", "Collapse all directories");
 
-			if (AssetLockManager.Instance is null)
+			if (AssetLockManager.Instance?.IsReady != true || !MasterEnable)
 			{
+				EditorGUILayout.HelpBox("Asset Lock is not ready. Configure it in Preferences, then reboot.", MessageType.Info);
 				if (GUILayout.Button(rebootLabel))
 				{
 					AssetLockManager.Reboot();
@@ -139,6 +171,8 @@ namespace AssetLock.Editor.UI
 					DoAsync(() => AssetLockManager.Instance.RefreshAsync());
 				}
 
+				EditorGUI.BeginDisabledGroup(AssetLockManager.Instance.AutomaticRefreshPaused);
+
 				if (GUILayout.Button(parseLabel))
 				{
 					AssetLockManager.Instance.ParseAll();
@@ -148,6 +182,7 @@ namespace AssetLock.Editor.UI
 				{
 					AssetLockManager.Instance.UnlockAll();
 				}
+				EditorGUI.EndDisabledGroup();
 			}
 
 			if (m_force)
@@ -187,7 +222,7 @@ namespace AssetLock.Editor.UI
 
 		private void FilesGUI()
 		{
-			if (AssetLockManager.Instance is null)
+			if (AssetLockManager.Instance?.IsReady != true || !MasterEnable)
 			{
 				return;
 			}
@@ -197,7 +232,7 @@ namespace AssetLock.Editor.UI
 			using (new HorizontalScope())
 			{
 				EditorGUI.BeginChangeCheck();
-				m_searchInput = DelayedTextField("Search:", m_searchInput);
+				m_searchInput = DelayedTextField(new GUIContent("Search:", "Use * to match any text; wildcard patterns match the whole name or path."), m_searchInput);
 
 				if (EditorGUI.EndChangeCheck() || !m_expanded.Any())
 				{
@@ -224,8 +259,9 @@ namespace AssetLock.Editor.UI
 		private static async void DoAsync(Func<Task> action)
 		{
 			s_busy = true;
-			await action();
-			s_busy = false;
+			try { await action(); }
+			catch (Exception error) { Logging.LogErrorFormat("Asset Lock operation failed ({0}).", error.GetType().Name); }
+			finally { s_busy = false; }
 		}
 
 		private void SetAllExpanded(bool value)
@@ -291,11 +327,23 @@ namespace AssetLock.Editor.UI
 
 		private bool IsFileMatching(FileReference file, string ctx)
 		{
+			if (ctx != null && ctx.IndexOf('*') >= 0)
+			{
+				var pattern = ctx.Trim();
+				return MatchesBrowserSearch(file.NameWithExtension, pattern) ||
+				       MatchesBrowserSearch(file.UnityPath.Replace('\\', '/'), pattern.Replace('\\', '/'));
+			}
 			return MatchSearchGroups(ctx, file.NameWithExtension);
 		}
 
 		private bool IsDirectoryMatching(DirectoryReference dir, string ctx)
 		{
+			if (ctx != null && ctx.IndexOf('*') >= 0)
+			{
+				var pattern = ctx.Trim();
+				return MatchesBrowserSearch(dir.Name, pattern) ||
+				       MatchesBrowserSearch(dir.UnityPath.Replace('\\', '/'), pattern.Replace('\\', '/'));
+			}
 			return MatchSearchGroups(ctx, dir.Name);
 		}
 
@@ -346,7 +394,7 @@ namespace AssetLock.Editor.UI
 
 				if (files.Any())
 				{
-					EditorGUI.BeginDisabledGroup(busy);
+					EditorGUI.BeginDisabledGroup(busy || AssetLockManager.Instance.AutomaticRefreshPaused);
 
 					if (GUILayout.Button(refreshLabel))
 					{
@@ -397,14 +445,15 @@ namespace AssetLock.Editor.UI
 			async void DoDirAction(Func<Task> action)
 			{
 				m_dirBusy[dir] = true;
-				await action();
-				m_dirBusy[dir] = false;
+				try { await action(); }
+				catch (Exception error) { Logging.LogErrorFormat("Asset Lock operation failed ({0}).", error.GetType().Name); }
+				finally { m_dirBusy[dir] = false; }
 			}
 		}
 
 		private void DisplayLock(FileReference file, string ctx, bool forceBusy = false)
 		{
-			if (!MatchSearchGroups(ctx, file.NameWithExtension))
+			if (!IsFileMatching(file, ctx))
 			{
 				return;
 			}
@@ -448,7 +497,7 @@ namespace AssetLock.Editor.UI
 					m_busy[file] = false;
 				}
 
-				busy |= forceBusy;
+				busy |= forceBusy || AssetLockManager.Instance.AutomaticRefreshPaused;
 
 				EditorGUI.BeginDisabledGroup(busy);
 
@@ -522,8 +571,9 @@ namespace AssetLock.Editor.UI
 			async void DoFileAction(Func<Task> action)
 			{
 				m_busy[file] = true;
-				await action();
-				m_busy[file] = false;
+				try { await action(); }
+				catch (Exception error) { Logging.LogErrorFormat("Asset Lock operation failed ({0}).", error.GetType().Name); }
+				finally { m_busy[file] = false; }
 			}
 		}
 	}

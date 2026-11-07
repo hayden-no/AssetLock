@@ -19,6 +19,7 @@ namespace AssetLock.Editor.Manager
 		public void Refresh()
 		{
 			ThrowIfNotInitialized();
+			AutomaticRefreshPaused = false;
 			
 			if (Refreshing)
 			{
@@ -34,6 +35,7 @@ namespace AssetLock.Editor.Manager
 		public async Task RefreshAsync()
 		{
 			ThrowIfNotInitialized();
+			AutomaticRefreshPaused = false;
 
 			if (!Refreshing)
 			{
@@ -52,6 +54,7 @@ namespace AssetLock.Editor.Manager
 		public void ForceRefresh()
 		{
 			ThrowIfNotInitialized();
+			AutomaticRefreshPaused = false;
 
 			if (m_disposed)
 			{
@@ -60,12 +63,31 @@ namespace AssetLock.Editor.Manager
 
 			if (Refreshing)
 			{
-				SpinWait.SpinUntil(() => !Refreshing);
-
 				return;
 			}
 
-			InnerLoopAsync().Wait(Constants.DEFAULT_LOCK_TIMEOUT);
+			try
+			{
+				var task = InnerLoopAsync();
+				if (task.Wait(Constants.DEFAULT_LOCK_TIMEOUT)) EndRefresh();
+				else _ = CompleteForcedRefreshAsync(task);
+			}
+			catch (Exception error)
+			{
+				FailRefresh(error.GetBaseException());
+			}
+		}
+
+		internal void RequestAutomaticRefresh(bool force = false)
+		{
+			if (AutomaticRefreshPaused || Refreshing) return;
+			if (force || m_refreshTimer <= 0f) TriggerLoop(0f);
+		}
+
+		private void ThrowIfRefreshPaused()
+		{
+			if (AutomaticRefreshPaused)
+				throw new InvalidOperationException("Lock refresh is paused. Check Git credentials and select Refresh to retry.");
 		}
 
 		/// <summary>
@@ -108,6 +130,7 @@ namespace AssetLock.Editor.Manager
 		internal void TrackFile(FileReference reference, bool force = false)
 		{
 			ThrowIfNotInitialized();
+			ThrowIfRefreshPaused();
 
 			if (!force && !ShouldTrack(reference))
 			{
@@ -146,6 +169,7 @@ namespace AssetLock.Editor.Manager
 		internal void UntrackFile(FileReference reference, bool force = false)
 		{
 			ThrowIfNotInitialized();
+			ThrowIfRefreshPaused();
 
 			if (!force && !m_lockRepo.ContainsKey(reference))
 			{
@@ -181,6 +205,7 @@ namespace AssetLock.Editor.Manager
 		internal void LockFile(FileReference reference, bool force = false)
 		{
 			ThrowIfNotInitialized();
+			ThrowIfRefreshPaused();
 
 			if (!force)
 			{
@@ -215,6 +240,14 @@ namespace AssetLock.Editor.Manager
 			TriggerLoop();
 		}
 
+		internal void QueueWarningAutoLock(FileReference reference, Action<FileReference, string> completed)
+		{
+			ThrowIfNotInitialized();
+			ThrowIfRefreshPaused();
+			m_commandQueue.Enqueue(new Command(CommandKind.WarningAutoLock, reference) { Completed = completed });
+			TriggerLoop();
+		}
+
 		public async Task LockFileAsync(string path, bool force = false)
 		{
 			await LockFileAsync(FileReference.FromPath(path), force);
@@ -240,6 +273,7 @@ namespace AssetLock.Editor.Manager
 		internal void UnlockFile(FileReference reference, bool force = false)
 		{
 			ThrowIfNotInitialized();
+			ThrowIfRefreshPaused();
 
 			if (!force)
 			{
@@ -282,6 +316,7 @@ namespace AssetLock.Editor.Manager
 		internal void RefreshFile(FileReference reference)
 		{
 			ThrowIfNotInitialized();
+			ThrowIfRefreshPaused();
 			m_commandQueue.Enqueue(new Command(CommandKind.Update, reference));
 			TriggerLoop();
 		}

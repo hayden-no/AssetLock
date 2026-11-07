@@ -24,6 +24,7 @@ namespace AssetLock.Editor.Tests
         public void GitHubAuthorizationHasOneBearerPrefixAndLogsAreRedacted()
         {
             GitHubRemoteAuthToken.SetValue("secret-token");
+            CredentialsType.SetValue(AssetLockUtility.CredentialsKind.GitHub);
             using var request = UnityWebRequest.Get("https://github.com/example/locks?token=secret-query");
             Manager.AppendHeaders(request);
             Assert.That(request.GetRequestHeader("Authorization"), Is.EqualTo("Bearer secret-token"));
@@ -42,7 +43,9 @@ namespace AssetLock.Editor.Tests
             CredentialsPassword.SetValue("password");
             using var gitlab = UnityWebRequest.Get("https://gitlab.com/example/locks");
             using var generic = UnityWebRequest.Get("https://example.test/locks");
+            CredentialsType.SetValue(AssetLockUtility.CredentialsKind.GitLab);
             Manager.AppendHeaders(gitlab);
+            CredentialsType.SetValue(AssetLockUtility.CredentialsKind.UserPass);
             Manager.AppendHeaders(generic);
             Assert.That(gitlab.GetRequestHeader("Authorization"), Is.EqualTo("Basic " + Convert.ToBase64String(Encoding.ASCII.GetBytes("gitlab-user:gitlab-token"))));
             Assert.That(generic.GetRequestHeader("Authorization"), Is.EqualTo("Basic " + Convert.ToBase64String(Encoding.ASCII.GetBytes("user:password"))));
@@ -54,6 +57,87 @@ namespace AssetLock.Editor.Tests
             Assert.That(AssetLockUtility.IsGitHubUrl("https://github.com.example.test/locks"), Is.False);
             Assert.That(AssetLockUtility.IsGitLabUrl("https://example.test/locks?next=gitlab.com"), Is.False);
             Assert.That(AssetLockUtility.IsGitHubUrl("https://api.github.com/locks"), Is.True);
+        }
+
+        [Test]
+        public void ProjectIdentitiesArePrivateAndSavedProfilesContainNoSecrets()
+        {
+            var first = ProjectUserKey("identity", Path.Combine(Application.temporaryCachePath, "first"));
+            var second = ProjectUserKey("identity", Path.Combine(Application.temporaryCachePath, "second"));
+            Assert.That(first, Is.Not.EqualTo(second));
+            var store = UserSettings.GetRepository(UnityEditor.SettingsScope.User);
+            store.Set(first, "account-one");
+            store.Set(second, "account-two");
+            Assert.That(store.Get(first, ""), Is.EqualTo("account-one"));
+            Assert.That(store.Get(second, ""), Is.EqualTo("account-two"));
+            var profile = new CredentialIdentity { Name = "test-profile", Username = "account-one", Authority = "https://example.test" };
+            CredentialIdentities.Current = profile;
+            CredentialIdentities.SaveProfile(profile);
+            profile.Username = "changed-locally";
+            Assert.That(CredentialIdentities.Saved.Find(p => p.Name == "test-profile").Username, Is.EqualTo("account-one"));
+            Assert.That(store.Get(CredentialIdentities.SharedKey, ""), Does.Not.Contain("secret-token"));
+            CredentialIdentities.DeleteProfile("test-profile");
+        }
+
+        [Test]
+        public void HttpUsesSelectedGitAccountWithoutInteractiveBackgroundPrompts()
+        {
+            UseGitCredentialHelper.SetValue(true);
+            GitLfsServerUrl.SetValue("https://example.test/team/repo/info/lfs");
+            GitLfsServerLocksApiUrl.SetValue("https://example.test/team/repo/info/lfs/locks");
+            CredentialIdentities.Current = new CredentialIdentity { Username = "alice", Authority = "https://example.test" };
+            bool? interactive = null;
+            GitCredentialClient.TestCommand = (operation, scope, user, password, allowUi) =>
+            {
+                Assert.That(operation, Is.EqualTo("fill"));
+                Assert.That(scope.AbsolutePath, Is.EqualTo("/team/repo/info/lfs"));
+                Assert.That(user, Is.EqualTo("alice"));
+                interactive = allowUi;
+                return Task.FromResult("username=alice\npassword=secret-token\n");
+            };
+            Manager.HttpTransport = request =>
+            {
+                Assert.That(request.GetRequestHeader("Authorization"), Is.EqualTo("Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes("alice:secret-token"))));
+                Assert.That(request.redirectLimit, Is.Zero);
+                return Task.FromResult(new AssetLock.Editor.Manager.HttpResult(200, "{\"locks\":[]}"));
+            };
+            Assert.That(Manager.ListLocksHttp(new ListLocksRequest()).GetAwaiter().GetResult().success, Is.True);
+            Assert.That(interactive, Is.False);
+        }
+
+        [Test]
+        public void HttpRejectsWrongAccountAndServerBeforeSendingCredentials()
+        {
+            UseGitCredentialHelper.SetValue(true);
+            GitLfsServerUrl.SetValue("https://example.test/repo/info/lfs");
+            GitLfsServerLocksApiUrl.SetValue("https://example.test/repo/info/lfs/locks");
+            CredentialIdentities.Current = new CredentialIdentity { Username = "alice", Authority = "https://example.test" };
+            GitCredentialClient.TestCommand = (_, _, _, _, _) => Task.FromResult("username=bob\npassword=secret\n");
+            bool sent = false;
+            Manager.HttpTransport = _ => { sent = true; return Task.FromResult(new AssetLock.Editor.Manager.HttpResult(200, "{}")); };
+            Assert.Throws<InvalidOperationException>(() => Manager.TestConnection().GetAwaiter().GetResult());
+            Assert.That(sent, Is.False);
+            GitLfsServerLocksApiUrl.SetValue("https://other.test/locks");
+            Assert.Throws<InvalidOperationException>(() => Manager.TestConnection().GetAwaiter().GetResult());
+            Assert.That(sent, Is.False);
+        }
+
+        [Test]
+        public void ExplicitSignInApprovesCredentialsOnlyAfterSuccessfulConnection()
+        {
+            var identity = new CredentialIdentity { Username = "alice", Authority = "https://example.test" };
+            var scope = new Uri("https://example.test/repo/info/lfs");
+            var calls = new List<string>();
+            GitCredentialClient.TestCommand = (operation, _, _, _, interactive) =>
+            {
+                calls.Add(operation + ":" + interactive);
+                return Task.FromResult(operation == "fill" ? "username=alice\npassword=secret\n" : "");
+            };
+            Assert.Throws<InvalidOperationException>(() => GitCredentialClient.ConnectAsync(scope, identity, () => Task.FromResult(false)).GetAwaiter().GetResult());
+            Assert.That(calls, Is.EqualTo(new[] { "fill:True" }));
+            calls.Clear();
+            GitCredentialClient.ConnectAsync(scope, identity, () => Task.FromResult(true)).GetAwaiter().GetResult();
+            Assert.That(calls, Is.EqualTo(new[] { "fill:True", "approve:False" }));
         }
 
         [Test]
@@ -100,7 +184,7 @@ namespace AssetLock.Editor.Tests
             var file = FileReference.FromPath("Assets/example.asset");
             Manager.TestRepo[file] = new LockInfo { path = "Assets/example.asset", locked = true, owner = "other" };
             Manager.HttpTransport = _ => Task.FromResult(new HttpResult(200, body));
-            LogAssert.Expect(LogType.Error, "[AssetLock] [HTTP] Invalid list locks response.");
+            LogAssert.Expect(LogType.Error, new Regex("Invalid list locks response"));
             Assert.Throws<InvalidOperationException>(() => Manager.InnerLoopAsync().GetAwaiter().GetResult());
             Assert.That(Manager.TestRepo[file].locked, Is.True);
         }
@@ -118,6 +202,20 @@ namespace AssetLock.Editor.Tests
             Assert.That(Manager.TestRepo[file].locked, Is.True);
             Manager.HttpTransport = _ => Task.FromResult(new HttpResult(200, "{\"locks\":[]}"));
             Assert.DoesNotThrow(() => Manager.InnerLoopAsync().GetAwaiter().GetResult());
+        }
+
+        [Test]
+        public void UnauthorizedHttpDoesNotSwitchToCommandLine()
+        {
+            UseHttp.SetValue(true);
+            GitLfsServerLocksApiUrl.SetValue("https://example.test/locks");
+            Manager.HttpTransport = _ => Task.FromResult(new HttpResult(401, "{}", "Unauthorized"));
+            LogAssert.Expect(LogType.Error, new Regex("Failed to access remote"));
+            LogAssert.Expect(LogType.Warning, new Regex("HTTP lock requests failed"));
+            var result = Manager.ListLocksHttp(new ListLocksRequest()).GetAwaiter().GetResult();
+            Assert.That(result.success, Is.False);
+            Assert.That(UseHttp.value, Is.True);
+            Assert.That(Lfs.Calls, Is.Empty);
         }
 
         [UnityTest]
