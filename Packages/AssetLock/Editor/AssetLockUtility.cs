@@ -98,6 +98,13 @@ namespace AssetLock.Editor
 				return false;
 			}
 
+			[RuntimeInitializeOnLoadMethod]
+			static void Init()
+			{
+				// reset statics here for domain reload compat
+				s_ErrorOnce = new HashSet<string>();
+			}
+
 			// ReSharper disable Unity.PerformanceAnalysis
 			[HideInCallstack]
 			public static void LogVerbose(string message)
@@ -233,6 +240,18 @@ namespace AssetLock.Editor
 			{
 				if (ErrorLogging) UnityEngine.Debug.LogErrorFormat(context, GetMessage(format), args);
 			}
+
+			[StringFormatMethod("format"), HideInCallstack]
+			public static void LogErrorOnce(string format, params object[] args)
+			{
+				string msg;
+				if (ErrorLogging && s_ErrorOnce.Add(msg=string.Format(format, args)))
+				{
+					LogError(msg);
+				}
+			}
+			
+			static HashSet<string> s_ErrorOnce = new HashSet<string>();
 
 			public struct Profiler : IDisposable
 			{
@@ -509,8 +528,10 @@ namespace AssetLock.Editor
 
 			if (StartsWithDirectory(path, Path.GetFileName(dataDirectory)) || StartsWithDirectory(path, "Packages"))
 				return Path.GetFullPath(Path.Combine(projectDirectory, path));
+			
+			if (StartsWithDirectory(path, "ProjectSettings")) return Path.GetFullPath(Path.Combine(projectDirectory, path));
 
-			Logging.LogErrorFormat(
+			Logging.LogErrorOnce(
 				"Could not determine the full path for {0}.\nUnityProj: {1}\nUnityData: {2}",
 				path,
 				projectDirectory,

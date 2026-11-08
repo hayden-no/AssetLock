@@ -1,6 +1,6 @@
 {
   "name": "com.haydenno.assetlock",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "displayName": "Git LFS Asset Lock",
   "description": "Integrate a local Git LFS repository with the Unity Editor.",
   "unity": "2022.3",
