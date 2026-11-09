@@ -110,7 +110,7 @@ namespace AssetLock.Editor.Manager
 		/// </summary>
 		static AssetLockManager()
 		{
-			if (!TestMode) Instance ??= new AssetLockManager();
+			if (!TestMode && !DisableAssetLockFlag) Instance ??= new AssetLockManager();
 		}
 
 		private AssetLockManager()

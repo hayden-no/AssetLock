@@ -17,6 +17,8 @@ namespace AssetLock.Editor
 	{
 		internal static bool TestMode =>
 			System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-assetLockTestMode") >= 0;
+		
+		internal static bool DisableAssetLockFlag => System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-disableAssetLock") >= 0;
 
 		// SettingsManager dispatches by repository type. Reimplement the interface
 		// so test settings remain in memory instead of touching EditorPrefs.
